@@ -14,7 +14,8 @@
       "Bash(matlab:*)",
       "Bash(dir:*)",
       "Bash(findstr:*)",
-      "Bash(del debug_integration.m quick_test_type3.m quick_test_type3_fixed.m fix_solver_and_integration.m fix_continuous_states.m fix_output_ports.m fix_data_logging.m type3_controller_function.m create_type3_controller_matlab_func.m integrate_controller_to_framework.m)"
+      "Bash(del debug_integration.m quick_test_type3.m quick_test_type3_fixed.m fix_solver_and_integration.m fix_continuous_states.m fix_output_ports.m fix_data_logging.m type3_controller_function.m create_type3_controller_matlab_func.m integrate_controller_to_framework.m)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nrefactor: Clean up and finalize Type 3 Controller implementation\n\nRemoved intermediate test/debug files:\n- All debug_*.m files\n- All fix_*.m files  \n- quick_test_type3*.m files\n- create/integrate scripts (task completed)\n- type3_controller_function.m (evalin issue version)\n\nKept final working version:\n- Type3_Controller_MatlabFunc.slx - Controller model\n- Control_System_Integrated.slx - Integrated system\n- type3_controller_function_fixed.m - MATLAB Function implementation\n- complete_test_type3.m - Final test script\n- Type3_Controller_README.md - Documentation\n\nController successfully:\n- Implements PDF page 3 mathematics\n- Runs at 100 kHz sampling\n- Uses ode23tb solver for mixed continuous/discrete system\n- Generates performance visualization\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []

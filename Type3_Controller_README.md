@@ -41,3 +41,5 @@ lambda_e = 0.3;  % Estimator eigenvalue
 - 所有中間測試和 debug 檔案已刪除
 - 控制器參數 (λc, λe) 目前寫死在程式碼中
 - 系統包含連續狀態，使用 ode23tb 求解器
+- 控制器輸出 u 已正確連接到 DAC (經由 Demux_u → Mux_DAC)
+- 移除了多餘的 u_in 外部端口
