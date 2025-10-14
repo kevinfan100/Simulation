@@ -3,8 +3,8 @@ function [u, e] = fcn(vd, vm)
     % Simplest disturbance model: wT[k+1] = wT[k]
 
     % Direct parameter setting (avoid evalin for code generation)
-    lambda_c = 0.5;  % Control eigenvalue
-    lambda_e = 0.3;  % Estimator eigenvalue
+    lambda_c = 0.9391;  % Control eigenvalue
+    lambda_e = 0.7304;  % Estimator eigenvalue
 
     % Fixed parameters (embedded)
     a1 = 1.595052025060797;
