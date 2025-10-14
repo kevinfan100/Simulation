@@ -1,0 +1,39 @@
+# MATLAB files
+*.mat
+*.asv
+*.m~
+*.fig
+
+# Simulink cache and autosave
+*.autosave
+slprj/
+*.slxc
+
+# Simulation cache
+*.r2023a
+*.r2023b
+*.r2024a
+*.r2024b
+
+# Temporary files
+*.tmp
+*.log
+*~
+
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+
+# Documentation build artifacts
+docs/_build/
+*.pdf
+
+# Except for specific PDF documentation
+!Flux_Control_*_model.pdf
+!Flux_Control_B_oldmodel_merged.pdf
+!Flux_Control_R_newmodel.pdf
