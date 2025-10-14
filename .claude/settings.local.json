@@ -9,7 +9,12 @@
       "Bash(move usa_demo_screenshot.png images )",
       "Bash(move taiwan_demo_screenshot.png images)",
       "Bash(python:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Implement Type 3 Controller with MATLAB Function (Phase 1&2)\n\nPhase 1: Created MATLAB Function-based controller\n- create_type3_controller_matlab_func.m: Auto-generate Simulink model\n- type3_controller_function.m: Controller implementation (PDF page 3)\n- Fixed parameters: a1, a2, B_inv embedded in function\n- Tunable parameters: lambda_c, lambda_e from workspace\n\nPhase 2: Integrated controller to framework\n- integrate_controller_to_framework.m: Integration script\n- Connects From_Vd/From_Vm to controller inputs\n- Controller output to u_in\n- Added error monitoring (e_log, Scope_e)\n\nAdditional:\n- quick_test_type3.m: Quick test script for validation\n- Removed old block-based controller files (replaced with MATLAB Function)\n\nController implements:\n- Tracking error: δv[k] = vd[k-1] - vm[k]\n- Control law: u[k] = B^(-1){vff + δvfb - ŵT}\n- Estimator with λe eigenvalue assignment\n- Sample time: 100 kHz (Ts = 1e-5)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(matlab:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(del debug_integration.m quick_test_type3.m quick_test_type3_fixed.m fix_solver_and_integration.m fix_continuous_states.m fix_output_ports.m fix_data_logging.m type3_controller_function.m create_type3_controller_matlab_func.m integrate_controller_to_framework.m)"
     ],
     "deny": [],
     "ask": []

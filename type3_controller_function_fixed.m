@@ -2,9 +2,9 @@ function [u, e] = fcn(vd, vm)
     % Type 3 Flux Controller - Based on PDF Page 3
     % Simplest disturbance model: wT[k+1] = wT[k]
 
-    % Get tunable parameters from workspace
-    lambda_c = evalin('base', 'lambda_c');
-    lambda_e = evalin('base', 'lambda_e');
+    % Direct parameter setting (avoid evalin for code generation)
+    lambda_c = 0.5;  % Control eigenvalue
+    lambda_e = 0.3;  % Estimator eigenvalue
 
     % Fixed parameters (embedded)
     a1 = 1.595052025060797;
