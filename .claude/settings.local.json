@@ -20,7 +20,12 @@
       "Bash(del test_sine_wave_integration_fixed.m debug_dimension_issue.m test_extreme_frequencies.m inspect_model_structure.m plot_results_simple.m run_frequency_sweep.m)",
       "Bash(del:*)",
       "Read(//c/Users/PME406_01/Desktop/code/**)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git branch:*)",
+      "Bash(git mv:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

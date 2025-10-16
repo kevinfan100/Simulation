@@ -197,17 +197,17 @@ if ~bdIsLoaded(model_name)
 end
 fprintf('  ✓ 模型已開啟\n');
 
-% 使用 configure_sine_wave 函數設定信號
+% 使用 configure_sine_wave_preview_v2 函數設定信號（Preview 版本）
 try
     if strcmpi(signal_type, 'sine')
-        configure_sine_wave(model_name, 'sine', active_channel, ...
+        configure_sine_wave_preview_v2('sine', active_channel, ...
                           amplitude, sine_frequency, sine_phase);
     else
-        configure_sine_wave(model_name, 'step', active_channel, amplitude, 0, 0);
+        configure_sine_wave_preview_v2('step', active_channel, amplitude, 0, 0);
     end
-    fprintf('  ✓ 信號已配置\n');
+    fprintf('  ✓ 信號已配置 (Preview 版本)\n');
 catch ME
-    error('信號配置失敗: %s\n可能原因：模型中缺少必要的 Sine Wave blocks\n請執行 verify_sine_wave_setup 檢查', ME.message);
+    error('信號配置失敗: %s\n可能原因：模型中 Vd_Generator 未設定為 Workspace 版本\n請執行 scripts/r_controller/set_workspace_vd_generator.m', ME.message);
 end
 
 % 設定模擬參數
