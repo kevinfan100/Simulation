@@ -1,5 +1,5 @@
-% run_controller_test_v2.m
-% Type 3 MIMO Controller 自動化測試腳本 (版本 2.0)
+% run_type3_test.m
+% Type 3 MIMO Controller 自動化測試腳本 (版本 3.0 - Refactored)
 %
 % 新功能：
 %   ✓ Sine Wave 支援（需要模型已添加 Sine Wave blocks）
@@ -7,11 +7,17 @@
 %   ✓ 6 通道時域響應對比
 %   ✓ 自動模擬時間調整
 %   ✓ 標準配色方案（P1-P6）
+%   ✓ 模組化目錄結構
 %
 % Author: Claude Code
-% Date: 2025-10-15
+% Date: 2025-10-16
 
 clear; clc; close all;
+
+% 添加共用函數路徑
+script_dir_temp = fileparts(mfilename('fullpath'));
+scripts_root_temp = fullfile(script_dir_temp, '..');
+addpath(fullfile(scripts_root_temp, 'common'));
 
 %% ═══════════════════════════════════════════════════════════════
 %                     SECTION 1: 配置區域
@@ -20,7 +26,7 @@ clear; clc; close all;
 % ┌─────────────────────────────────────────────────────────────┐
 % │                      測試識別                                │
 % └─────────────────────────────────────────────────────────────┘
-test_name = 'P5_Sine_500H_test_fb1_w0.5';    % 測試名稱（用於檔案命名）
+test_name = 'type3_P5_Sine_500H_validation';    % 測試名稱（用於檔案命名）
 
 % ┌─────────────────────────────────────────────────────────────┐
 % │                   參考輸入 (Vd) 配置                         │
@@ -52,12 +58,14 @@ solver = 'ode23tb';              % Simulink solver
 % ┌─────────────────────────────────────────────────────────────┐
 % │                      模型配置                                │
 % └─────────────────────────────────────────────────────────────┘
-model_name = 'Control_System_Integrated';
+model_name = 'type3_system_integrated';
+controller_type = 'type3';
 
 % 取得腳本所在目錄的絕對路徑
-script_dir = fileparts(mfilename('fullpath'));
-project_root = fullfile(script_dir, '..');
-model_path = fullfile(project_root, [model_name '.slx']);
+script_dir = fileparts(mfilename('fullpath'));      % scripts/type3/
+scripts_root = fullfile(script_dir, '..');          % scripts/
+project_root = fullfile(scripts_root, '..');        % Simulation/
+model_path = fullfile(project_root, 'controllers', controller_type, [model_name '.slx']);
 
 % ┌─────────────────────────────────────────────────────────────┐
 % │                    控制器參數（參考）                        │
@@ -95,7 +103,7 @@ max_ss_error_allow = 1e-4;       % 允許的最大穩態誤差 [V]
 ENABLE_PLOT = true;              % 顯示圖表
 SAVE_PNG = true;                 % 保存圖片 (.png)
 SAVE_MAT = true;                 % 保存數據 (.mat)
-output_dir = 'test_results';     % 輸出目錄名稱（稍後會設為絕對路徑）
+output_dir = fullfile('test_results', controller_type);  % 輸出目錄: test_results/type3/
 
 %% ═══════════════════════════════════════════════════════════════
 %                   配置區域結束 (以下為自動執行)
