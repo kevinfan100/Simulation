@@ -123,6 +123,19 @@ Simulation/
 
 **Required Configuration Section Format:**
 ```matlab
+clear; clc; close all;
+
+% IMPORTANT: Add paths for Simulink Model Reference
+script_dir_temp = fileparts(mfilename('fullpath'));
+scripts_root_temp = fullfile(script_dir_temp, '..');
+project_root_temp = fullfile(scripts_root_temp, '..');
+
+% Add common utilities to path
+addpath(fullfile(scripts_root_temp, 'common'));
+
+% Add controller directory to path (for Simulink Model Reference)
+addpath(fullfile(project_root_temp, 'controllers', '{controller_type}'));
+
 %% ═══════════════════════════════════════════════════════════════
 %                     SECTION 1: 配置區域
 %  ═══════════════════════════════════════════════════════════════
