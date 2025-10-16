@@ -14,10 +14,16 @@
 
 clear; clc; close all;
 
-% 添加共用函數路徑
+% 添加必要的路徑
 script_dir_temp = fileparts(mfilename('fullpath'));
 scripts_root_temp = fullfile(script_dir_temp, '..');
+project_root_temp = fullfile(scripts_root_temp, '..');
+
+% 添加共用函數路徑
 addpath(fullfile(scripts_root_temp, 'common'));
+
+% 添加控制器目錄到路徑（讓 Simulink 找到 Model Reference）
+addpath(fullfile(project_root_temp, 'controllers', 'r_controller'));
 
 %% ═══════════════════════════════════════════════════════════════
 %                     SECTION 1: 配置區域
