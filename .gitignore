@@ -3,6 +3,7 @@
 *.asv
 *.m~
 *.fig
+*.png
 
 # Simulink cache and autosave
 *.autosave
