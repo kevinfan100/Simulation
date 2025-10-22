@@ -4,44 +4,53 @@ clear; clc; close all;
 
 % 添加必要的路徑
 script_dir_temp = fileparts(mfilename('fullpath'));
-scripts_root_temp = fullfile(script_dir_temp, '..');
-project_root_temp = fullfile(scripts_root_temp, '..');
-addpath(fullfile(scripts_root_temp, 'common'));
-addpath(fullfile(project_root_temp, 'controllers', 'r_controller'));
+package_root_temp = fullfile(script_dir_temp, '..');
+addpath(fullfile(package_root_temp, 'model'));
 
 %% SECTION 1: 配置區域
 
-test_name = 'r_controller_test';    % 測試名稱（用於檔案命名）
+test_name = 'test_d0_1000';    % 測試名稱（用於檔案命名）
 
+% preview
+d = 0
 %Vd Generator
 signal_type_name = 'sine';      % 'step' 或 'sine'
-Channel = 4;                    % 激發通道 (1-6)
-Amplitude = 0.5;               % 振幅 [V]
-Frequency = 100;                % Sine 頻率 [Hz]
+Channel = 5;                    % 激發通道 (1-6)
+Amplitude = 1;               % 振幅 [V]
+Frequency = 1000;                % Sine 頻率 [Hz]
 Phase = 0;                      % Sine 相位 [deg]
-StepTime = 0.01;                 % Step 跳變時間 [s]
+StepTime = 0;                 % Step 跳變時間 [s]
                              
 % Step 模式
 step_simulation_time = 0.5;     % Step 模式總模擬時間 [s]
 
 % Sine 模式（自動計算）
-sine_min_cycles = 30;           % 最少模擬週期數
+sine_min_cycles = 40;           % 最少模擬週期數
 sine_skip_cycles = 20;          % 跳過前 N 個週期（暫態）
 sine_display_cycles = 5;        % 顯示最後 N 個週期（穩態）
 sine_min_sim_time = 0.1;        % 最小模擬時間 [s]
 sine_max_sim_time = 50.0;       % 最大模擬時間 [s]
 
+% lambda corresponding bandwidth [Hz]
+T = 1e-5;
+fB_c = 3200;
+fB_e = 16000;
+
+lambda_c = exp(-fB_c*T*2*pi)
+lambda_e = exp(-fB_e*T*2*pi)
+beta = sqrt(lambda_e * lambda_c)
+
+% Noise
+
 
 Ts = 1e-5;                      % 採樣時間 [s] (100 kHz)
-solver = 'ode23tb';             % Simulink solver
+solver = 'ode45';             % Simulink solver  ode23tb
 
 model_name = 'r_controller_system_integrated';
-controller_type = 'r_controller';
 
 script_dir = fileparts(mfilename('fullpath'));
-scripts_root = fullfile(script_dir, '..');
-project_root = fullfile(scripts_root, '..');
-model_path = fullfile(project_root, 'controllers', controller_type, [model_name '.slx']);
+package_root = fullfile(script_dir, '..');
+model_path = fullfile(package_root, 'model', [model_name '.slx']);
 
 colors = [
     0.0000, 0.0000, 0.0000;  % P1: 黑色
@@ -62,7 +71,7 @@ reference_linewidth = 2.5;       % Reference 線粗細
 ENABLE_PLOT = true;
 SAVE_PNG = true;
 SAVE_MAT = true;
-output_dir = fullfile('test_results', controller_type);
+output_dir = 'test_results';
 
 %% SECTION 2: 初始化與驗證
 
@@ -104,7 +113,7 @@ fprintf('\n');
 
 % 創建輸出目錄
 if SAVE_PNG || SAVE_MAT
-    output_dir = fullfile(project_root, output_dir);
+    output_dir = fullfile(package_root, output_dir);
     if ~exist(output_dir, 'dir')
         mkdir(output_dir);
     end
@@ -235,6 +244,71 @@ if strcmpi(signal_type_name, 'sine')
     fprintf('  顯示週期數: %.1f\n', (t_display(end) - t_display(1)) / period);
     fprintf('  顯示數據點: %d\n', length(t_display));
     fprintf('\n');
+
+    %% SECTION 7.5: FFT 頻率響應分析
+
+    fprintf('【頻率響應分析 (FFT)】\n');
+    fprintf('────────────────────────\n');
+
+    % 對激勵通道的 Vd 做 FFT
+    Vd_fft = fft(Vd_display(:, Channel));
+    N_fft = length(Vd_fft);
+
+    % 計算頻率軸
+    fs = 1 / Ts;  % 採樣頻率
+    freq_axis = (0:N_fft-1) * fs / N_fft;
+
+    % 找到激勵頻率對應的 bin
+    [~, freq_idx] = min(abs(freq_axis - Frequency));
+
+    % 提取激勵頻率的幅度與相位
+    Vd_mag = abs(Vd_fft(freq_idx)) * 2 / N_fft;
+    Vd_phase = angle(Vd_fft(freq_idx)) * 180 / pi;
+
+    % 對每個 Vm 通道做 FFT
+    magnitude_ratio = zeros(1, 6);
+    phase_lag = zeros(1, 6);
+
+    for ch = 1:6
+        Vm_fft = fft(Vm_display(:, ch));
+        Vm_mag = abs(Vm_fft(freq_idx)) * 2 / N_fft;
+        Vm_phase = angle(Vm_fft(freq_idx)) * 180 / pi;
+
+        % 計算頻率響應
+        magnitude_ratio(ch) = Vm_mag / Vd_mag;
+        phase_lag(ch) = Vm_phase - Vd_phase;
+
+        % 相位差正規化到 [-180, 180]
+        if phase_lag(ch) > 180
+            phase_lag(ch) = phase_lag(ch) - 360;
+        elseif phase_lag(ch) < -180
+            phase_lag(ch) = phase_lag(ch) + 360;
+        end
+    end
+
+    % 找出除了激勵通道外，振幅比最大的通道
+    other_channels = setdiff(1:6, Channel);
+    [max_gain, max_idx] = max(magnitude_ratio(other_channels));
+    max_gain_channel = other_channels(max_idx);
+
+    % 顯示結果
+    fprintf('  激勵頻率: %.1f Hz\n', Frequency);
+    fprintf('  激勵通道: P%d\n', Channel);
+    fprintf('  數據點數: %d (%.2f 個週期)\n', N_fft, (t_display(end) - t_display(1)) / period);
+    fprintf('\n');
+    fprintf('  通道  |   振幅比    |   相位差\n');
+    fprintf('  ──────┼─────────────┼───────────\n');
+    for ch = 1:6
+        marker = '';
+        if ch == Channel
+            marker = '  ← 激勵通道';
+        elseif ch == max_gain_channel
+            marker = '  ← 最大響應';
+        end
+        fprintf('   P%d   |  %6.2f%%   |  %+7.2f°%s\n', ...
+                ch, magnitude_ratio(ch)*100, phase_lag(ch), marker);
+    end
+    fprintf('\n');
 end
 
 %% SECTION 8: 繪圖
@@ -250,15 +324,15 @@ if ENABLE_PLOT
         hold on;
         grid on;
 
-        % 繪製所有通道
+        % 繪製所有通道 (使用激發通道的 Vd)
         for ch = 1:6
-            plot(Vd_display(:, ch), Vm_display(:, ch), ...
+            plot(Vd_display(:, Channel), Vm_display(:, ch), ...
                  'Color', colors(ch, :), 'LineWidth', measurement_linewidth);
         end
 
-        xlabel('Vd (V)', 'FontSize', 11);
+        xlabel(sprintf('Vd[P%d] (V)', Channel), 'FontSize', 11);
         ylabel('Vm (V)', 'FontSize', 11);
-        title('Vm\_Vd', 'FontSize', 12, 'FontWeight', 'normal');
+        title(sprintf('Vm vs Vd[P%d]', Channel), 'FontSize', 12, 'FontWeight', 'normal');
 
         if vm_vd_unified_axis
             max_val = max([max(abs(Vd_display(:))), max(abs(Vm_display(:)))]);
@@ -272,7 +346,28 @@ if ENABLE_PLOT
         legend({'P1', 'P2', 'P3', 'P4', 'P5', 'P6'}, ...
                'Location', 'northeast', 'FontSize', 9);
 
-        fprintf('  ✓ Figure 1: Vm_Vd\n');
+        % 在左上角添加 FFT 頻率響應資訊
+        annotation_str = sprintf('Excited Ch P%d: Gain = %.2f%%, Phase = %+.2f°', ...
+                                 Channel, magnitude_ratio(Channel)*100, phase_lag(Channel));
+
+        % 使用 text 在左上角添加標註（數據座標系統）
+        ax = gca;
+        x_range = xlim;
+        y_range = ylim;
+        x_pos = x_range(1) + 0.05 * (x_range(2) - x_range(1));  % 左邊 5%
+        y_pos = y_range(2) - 0.08 * (y_range(2) - y_range(1));  % 上邊 8%
+
+        text(x_pos, y_pos, annotation_str, ...
+             'FontSize', 9, ...
+             'FontName', 'Consolas', ...
+             'BackgroundColor', [1 1 1 0.8], ...
+             'EdgeColor', [0.3 0.3 0.3], ...
+             'LineWidth', 1, ...
+             'Margin', 5, ...
+             'VerticalAlignment', 'top', ...
+             'HorizontalAlignment', 'left');
+
+        fprintf('  ✓ Figure 1: Vm_Vd (with FFT analysis)\n');
 
         % === 圖 2: 6 通道時域響應 ===
         fig2 = figure('Name', '6 Channels Time Response', ...
@@ -323,14 +418,38 @@ if ENABLE_PLOT
 
         fprintf('  ✓ Figure 3: Full Time Response\n');
 
-        % === 圖 4: W1_hat 估測值 ===
-        fig4 = figure('Name', 'W1_hat Estimation', ...
+        % === 計算最後 10 個週期的時間窗口 ===
+        period = 1 / Frequency;
+        detail_cycles = 10;  % 顯示最後 10 個週期
+
+        % 取最後 10 個週期（穩態）
+        t_start_detail = t(end) - detail_cycles * period;
+        t_end_detail = t(end);
+
+        % 確保時間範圍有效
+        t_start_detail = max(0, t_start_detail);
+        t_end_detail = min(t(end), t_end_detail);
+
+        % 選取數據
+        idx_detail = (t >= t_start_detail) & (t <= t_end_detail);
+        t_detail = t(idx_detail);
+        w1_hat_detail = w1_hat_data(idx_detail, :);
+        u_detail = u_data(idx_detail, :);
+        e_detail = e_data(idx_detail, :);
+
+        % 顯示資訊
+        actual_cycles = (t_end_detail - t_start_detail) / period;
+        fprintf('  📊 詳細分析窗口: %.4f - %.4f s (%.1f 個週期, %d 點)\n', ...
+                t_start_detail, t_end_detail, actual_cycles, sum(idx_detail));
+
+        % === 圖 4: W1_hat 估測值 (最後 10 個週期) ===
+        fig4 = figure('Name', sprintf('W1_hat Estimation (Last %d cycles)', detail_cycles), ...
                       'Position', [250, 250, 1200, 800]);
 
         for ch = 1:6
             subplot(2, 3, ch);
 
-            plot(t*1000, w1_hat_data(:, ch), '-', ...
+            plot(t_detail*1000, w1_hat_detail(:, ch), '-', ...
                  'Color', colors(ch, :), 'LineWidth', measurement_linewidth);
 
             grid on;
@@ -339,10 +458,55 @@ if ENABLE_PLOT
             title(sprintf('P%d', ch), 'FontSize', 10, 'FontWeight', 'normal');
         end
 
-        fprintf('  ✓ Figure 4: W1_hat Estimation\n');
+        fprintf('  ✓ Figure 4: W1_hat Estimation (Last %d cycles)\n', detail_cycles);
+
+        % === 圖 5: 控制輸入 u (最後 10 個週期) ===
+        fig5 = figure('Name', sprintf('Control Input u (Last %d cycles)', detail_cycles), ...
+                      'Position', [300, 300, 1200, 800]);
+
+        for ch = 1:6
+            subplot(2, 3, ch);
+
+            plot(t_detail*1000, u_detail(:, ch), '-', ...
+                 'Color', colors(ch, :), 'LineWidth', measurement_linewidth);
+
+            grid on;
+            xlabel('Time (ms)', 'FontSize', 9);
+            ylabel('Control Input u (V)', 'FontSize', 9);
+            title(sprintf('P%d', ch), 'FontSize', 10, 'FontWeight', 'normal');
+        end
+
+        fprintf('  ✓ Figure 5: Control Input u (Last %d cycles)\n', detail_cycles);
+
+        % === 圖 6: 追蹤誤差 e (最後 10 個週期) ===
+        fig6 = figure('Name', sprintf('Tracking Error e (Last %d cycles)', detail_cycles), ...
+                      'Position', [350, 350, 1200, 800]);
+
+        for ch = 1:6
+            subplot(2, 3, ch);
+
+            plot(t_detail*1000, e_detail(:, ch), '-', ...
+                 'Color', colors(ch, :), 'LineWidth', measurement_linewidth);
+
+            grid on;
+            xlabel('Time (ms)', 'FontSize', 9);
+            ylabel('Tracking Error e (V)', 'FontSize', 9);
+            title(sprintf('P%d', ch), 'FontSize', 10, 'FontWeight', 'normal');
+        end
+
+        fprintf('  ✓ Figure 6: Tracking Error e (Last %d cycles)\n', detail_cycles);
 
     else
         % === Step 模式繪圖 ===
+
+        % 選取從 2ms 開始的數據
+        idx_step = t >= 0.002;
+        t_step = t(idx_step);
+        Vm_step = Vm_data(idx_step, :);
+        Vd_step = Vd_data(idx_step, :);
+        e_step = e_data(idx_step, :);
+        u_step = u_data(idx_step, :);
+        w1_hat_step = w1_hat_data(idx_step, :);
 
         % 圖 1: 6 通道響應
         fig1 = figure('Name', 'Step Response - 6 Channels', ...
@@ -352,12 +516,12 @@ if ENABLE_PLOT
             subplot(2, 3, ch);
 
             % Measurement (實線)
-            plot(t, Vm_data(:, ch), '-', 'Color', colors(ch, :), ...
+            plot(t_step, Vm_step(:, ch), '-', 'Color', colors(ch, :), ...
                  'LineWidth', measurement_linewidth);
             hold on;
 
             % Reference (虛線)
-            plot(t, Vd_data(:, ch), '--', 'Color', [0, 0, 0], ...
+            plot(t_step, Vd_step(:, ch), '--', 'Color', [0, 0, 0], ...
                  'LineWidth', reference_linewidth);
 
             grid on;
@@ -379,7 +543,7 @@ if ENABLE_PLOT
                       'Position', [150, 150, 1000, 600]);
 
         for ch = 1:6
-            plot(t, e_data(:, ch), 'Color', colors(ch, :), ...
+            plot(t_step, e_step(:, ch), 'Color', colors(ch, :), ...
                  'LineWidth', measurement_linewidth);
             hold on;
         end
@@ -398,7 +562,7 @@ if ENABLE_PLOT
                       'Position', [200, 200, 1000, 600]);
 
         for ch = 1:6
-            plot(t, u_data(:, ch), 'Color', colors(ch, :), ...
+            plot(t_step, u_step(:, ch), 'Color', colors(ch, :), ...
                  'LineWidth', measurement_linewidth);
             hold on;
         end
@@ -411,6 +575,24 @@ if ENABLE_PLOT
                'Location', 'best', 'FontSize', 9);
 
         fprintf('  ✓ Figure 3: Control Input\n');
+
+        % 圖 4: W1_hat 估測值
+        fig4 = figure('Name', 'W1_hat Estimation', ...
+                      'Position', [250, 250, 1200, 800]);
+
+        for ch = 1:6
+            subplot(2, 3, ch);
+
+            plot(t_step, w1_hat_step(:, ch), '-', ...
+                 'Color', colors(ch, :), 'LineWidth', measurement_linewidth);
+
+            grid on;
+            xlabel('Time (s)', 'FontSize', 9);
+            ylabel('W1_{hat} (V)', 'FontSize', 9);
+            title(sprintf('P%d', ch), 'FontSize', 10, 'FontWeight', 'normal');
+        end
+
+        fprintf('  ✓ Figure 4: W1_hat Estimation\n');
     end
 
     fprintf('\n');
@@ -428,11 +610,14 @@ if SAVE_PNG || SAVE_MAT
             saveas(fig1, fullfile(test_dir, 'Vm_Vd.png'));
             saveas(fig2, fullfile(test_dir, '6ch_time_response.png'));
             saveas(fig3, fullfile(test_dir, 'full_response.png'));
-            saveas(fig4, fullfile(test_dir, 'w1_hat_estimation.png'));
+            saveas(fig4, fullfile(test_dir, 'w1_hat_estimation_1-100ms.png'));
+            saveas(fig5, fullfile(test_dir, 'control_input_u_1-100ms.png'));
+            saveas(fig6, fullfile(test_dir, 'tracking_error_e_1-100ms.png'));
         else
             saveas(fig1, fullfile(test_dir, 'step_response_6ch.png'));
             saveas(fig2, fullfile(test_dir, 'error_analysis.png'));
             saveas(fig3, fullfile(test_dir, 'control_input.png'));
+            saveas(fig4, fullfile(test_dir, 'w1_hat_estimation.png'));
         end
         fprintf('  ✓ Figures saved (.png)\n');
     end

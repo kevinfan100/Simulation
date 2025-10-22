@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<System>
+  <P Name="Location">[-1, -8, 1921, 1081]</P>
+  <P Name="ZoomFactor">422</P>
+  <Block BlockType="Inport" Name="Vd" SID="185">
+    <P Name="Position">[530, 235, 560, 255]</P>
+    <P Name="ZOrder">8</P>
+    <P Name="BackgroundColor">green</P>
+    <PortProperties>
+      <Port Type="out" Index="1">
+        <P Name="PropagatedSignals">vd</P>
+      </Port>
+    </PortProperties>
+  </Block>
+  <Block BlockType="Inport" Name="Vm" SID="186">
+    <P Name="Position">[530, 285, 560, 305]</P>
+    <P Name="ZOrder">9</P>
+    <P Name="BackgroundColor">green</P>
+    <P Name="Port">2</P>
+  </Block>
+  <Block BlockType="SubSystem" Name="r_controller_p1_d2" SID="187">
+    <PortCounts in="2" out="3"/>
+    <P Name="Position">[680, 220, 830, 320]</P>
+    <P Name="ZOrder">7</P>
+    <P Name="BackgroundColor">lightBlue</P>
+    <P Name="ErrorFcn">Stateflow.Translate.translate</P>
+    <P Name="PermitHierarchicalResolution">ExplicitOnly</P>
+    <P Name="TreatAsAtomicUnit">on</P>
+    <P Name="SFBlockType">MATLAB Function</P>
+    <P Name="ContentPreviewEnabled">on</P>
+    <PortProperties>
+      <Port Type="out" Index="1">
+        <P Name="PropagatedSignals">u</P>
+      </Port>
+      <Port Type="out" Index="2">
+        <P Name="PropagatedSignals">e</P>
+      </Port>
+      <Port Type="out" Index="3">
+        <P Name="PropagatedSignals">w1_hat</P>
+      </Port>
+    </PortProperties>
+    <System Ref="system_187"/>
+  </Block>
+  <Block BlockType="Outport" Name="u" SID="188">
+    <P Name="Position">[930, 225, 960, 245]</P>
+    <P Name="ZOrder">10</P>
+    <P Name="BackgroundColor">orange</P>
+  </Block>
+  <Block BlockType="Outport" Name="e" SID="189">
+    <P Name="Position">[930, 260, 960, 280]</P>
+    <P Name="ZOrder">11</P>
+    <P Name="BackgroundColor">orange</P>
+    <P Name="Port">2</P>
+  </Block>
+  <Block BlockType="Outport" Name="w1_hat" SID="190">
+    <P Name="Position">[930, 295, 960, 315]</P>
+    <P Name="ZOrder">12</P>
+    <P Name="BackgroundColor">orange</P>
+    <P Name="Port">3</P>
+  </Block>
+  <Line>
+    <P Name="ZOrder">1</P>
+    <P Name="Src">187#out:3</P>
+    <P Name="Dst">190#in:1</P>
+  </Line>
+  <Line>
+    <P Name="ZOrder">2</P>
+    <P Name="Src">187#out:2</P>
+    <P Name="Dst">189#in:1</P>
+  </Line>
+  <Line>
+    <P Name="ZOrder">3</P>
+    <P Name="Src">186#out:1</P>
+    <P Name="Dst">187#in:2</P>
+  </Line>
+  <Line>
+    <P Name="ZOrder">4</P>
+    <P Name="Src">185#out:1</P>
+    <P Name="Dst">187#in:1</P>
+  </Line>
+  <Line>
+    <P Name="ZOrder">5</P>
+    <P Name="Src">187#out:1</P>
+    <P Name="Dst">188#in:1</P>
+  </Line>
+</System>

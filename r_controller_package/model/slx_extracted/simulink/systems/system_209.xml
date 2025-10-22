@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<System>
+  <P Name="Location">[-1, -8, 1921, 1081]</P>
+  <P Name="ZoomFactor">220</P>
+  <Block BlockType="Constant" Name="Amplitude" SID="195">
+    <P Name="Position">[305, 314, 325, 336]</P>
+    <P Name="ZOrder">88</P>
+    <P Name="Value">Amplitude</P>
+  </Block>
+  <Block BlockType="Constant" Name="Channel" SID="194">
+    <P Name="Position">[280, 280, 300, 300]</P>
+    <P Name="ZOrder">87</P>
+    <P Name="Value">Channel</P>
+  </Block>
+  <Block BlockType="Clock" Name="Clock" SID="97">
+    <P Name="Position">[300, 449, 330, 481]</P>
+    <P Name="ZOrder">84</P>
+    <P Name="DisplayTime">on</P>
+  </Block>
+  <Block BlockType="Constant" Name="Frequency" SID="196">
+    <P Name="Position">[340, 350, 360, 370]</P>
+    <P Name="ZOrder">89</P>
+    <P Name="Value">Frequency</P>
+  </Block>
+  <Block BlockType="Constant" Name="Phase" SID="197">
+    <P Name="Position">[370, 385, 390, 405]</P>
+    <P Name="ZOrder">90</P>
+    <P Name="Value">Phase</P>
+  </Block>
+  <Block BlockType="Constant" Name="SignalType" SID="193">
+    <P Name="Position">[255, 245, 275, 265]</P>
+    <P Name="ZOrder">86</P>
+    <P Name="Value">SignalType</P>
+  </Block>
+  <Block BlockType="Constant" Name="StepTime" SID="198">
+    <P Name="Position">[400, 420, 420, 440]</P>
+    <P Name="ZOrder">91</P>
+    <P Name="Value">StepTime</P>
+  </Block>
+  <Block BlockType="SubSystem" Name="Vd_Generator" SID="98">
+    <PortCounts in="7" out="1"/>
+    <P Name="Position">[435, 229, 565, 491]</P>
+    <P Name="ZOrder">85</P>
+    <P Name="ErrorFcn">Stateflow.Translate.translate</P>
+    <P Name="PermitHierarchicalResolution">ExplicitOnly</P>
+    <P Name="TreatAsAtomicUnit">on</P>
+    <P Name="SFBlockType">MATLAB Function</P>
+    <P Name="ContentPreviewEnabled">on</P>
+    <PortProperties>
+      <Port Type="out" Index="1">
+        <P Name="PropagatedSignals">vd</P>
+      </Port>
+    </PortProperties>
+    <System Ref="system_98"/>
+  </Block>
+  <Block BlockType="Outport" Name="vd" SID="211">
+    <P Name="Position">[605, 353, 635, 367]</P>
+    <P Name="ZOrder">-2</P>
+  </Block>
+  <Line>
+    <P Name="ZOrder">3</P>
+    <P Name="Src">97#out:1</P>
+    <P Name="Dst">98#in:7</P>
+  </Line>
+  <Line>
+    <P Name="ZOrder">4</P>
+    <P Name="Src">196#out:1</P>
+    <P Name="Dst">98#in:4</P>
+  </Line>
+  <Line>
+    <P Name="ZOrder">5</P>
+    <P Name="Src">193#out:1</P>
+    <P Name="Dst">98#in:1</P>
+  </Line>
+  <Line>
+    <P Name="ZOrder">6</P>
+    <P Name="Src">198#out:1</P>
+    <P Name="Dst">98#in:6</P>
+  </Line>
+  <Line>
+    <P Name="ZOrder">7</P>
+    <P Name="Src">197#out:1</P>
+    <P Name="Dst">98#in:5</P>
+  </Line>
+  <Line>
+    <P Name="ZOrder">8</P>
+    <P Name="Src">195#out:1</P>
+    <P Name="Dst">98#in:3</P>
+  </Line>
+  <Line>
+    <P Name="ZOrder">9</P>
+    <P Name="Src">194#out:1</P>
+    <P Name="Dst">98#in:2</P>
+  </Line>
+  <Line>
+    <P Name="ZOrder">10</P>
+    <P Name="Src">98#out:1</P>
+    <P Name="Dst">211#in:1</P>
+  </Line>
+</System>
