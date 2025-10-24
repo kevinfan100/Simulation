@@ -31,7 +31,7 @@ d_values = [0, 2];
 
 % Vd Generator 設定
 signal_type_name = 'sine';
-Channel = 6;              % 激勵通道 (P5)
+Channel = 3;              % 激勵通道 (P5)
 Amplitude = 1;            % 振幅 [V]
 Phase = 0;                % 相位 [deg]
 SignalType = 1;           % Sine mode

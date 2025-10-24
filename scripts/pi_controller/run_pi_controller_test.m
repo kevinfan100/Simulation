@@ -1,56 +1,52 @@
-% run_rcontroller_test.m
+% run_pi_controller_test.m
+% PI Controller 自動化測試腳本
 
 clear; clc; close all;
 
 % 添加必要的路徑
 script_dir_temp = fileparts(mfilename('fullpath'));
-package_root_temp = fullfile(script_dir_temp, '..');
-addpath(fullfile(package_root_temp, 'model'));
+scripts_root_temp = fullfile(script_dir_temp, '..');
+project_root_temp = fullfile(scripts_root_temp, '..');
+addpath(fullfile(scripts_root_temp, 'common'));
+addpath(fullfile(project_root_temp, 'controllers', 'pi_controller'));
 
 %% SECTION 1: 配置區域
 
-test_name = 'test_d4_1000';    % 測試名稱（用於檔案命名）
+test_name = 'step_2_2206_p3';    % 測試名稱（用於檔案命名）
 
-% preview
-d = 4
-%Vd Generator
-signal_type_name = 'sine';      % 'step' 或 'sine'
-Channel = 5;                    % 激發通道 (1-6)
-Amplitude = 1;               % 振幅 [V]
-Frequency = 1000;                % Sine 頻率 [Hz]
+% Vd Generator
+signal_type_name = 'step';      % 'step' 或 'sine'
+Channel = 3;                    % 激發通道 (1-6)
+Amplitude = 1;                  % 振幅 [V]
+Frequency = 10;                % Sine 頻率 [Hz]
 Phase = 0;                      % Sine 相位 [deg]
-StepTime = 0;                 % Step 跳變時間 [s]
-                             
+StepTime = 0;                % Step 跳變時間 [s]
+
 % Step 模式
 step_simulation_time = 0.5;     % Step 模式總模擬時間 [s]
 
 % Sine 模式（自動計算）
-sine_min_cycles = 40;           % 最少模擬週期數
+sine_min_cycles = 30;           % 最少模擬週期數
 sine_skip_cycles = 20;          % 跳過前 N 個週期（暫態）
 sine_display_cycles = 5;        % 顯示最後 N 個週期（穩態）
 sine_min_sim_time = 0.1;        % 最小模擬時間 [s]
 sine_max_sim_time = 50.0;       % 最大模擬時間 [s]
 
-% lambda corresponding bandwidth [Hz]
-T = 1e-5;
-fB_c = 3200;
-fB_e = 16000;
-
-lambda_c = exp(-fB_c*T*2*pi)
-lambda_e = exp(-fB_e*T*2*pi)
-beta = sqrt(lambda_e * lambda_c)
-
-% Noise
-
+% PI 控制器參數
+zc = 2206;
+Kp_value = 2;                 % 比例增益
+Ki_value = Kp_value * zc;       % 積分增益
 
 Ts = 1e-5;                      % 採樣時間 [s] (100 kHz)
-solver = 'ode45';             % Simulink solver  ode23tb
+solver = 'ode23tb';             % Simulink solver
 
-model_name = 'r_controller_system_integrated';
+model_name = 'PI_Controller_Integrated';
+controller_type = 'pi_controller';
 
 script_dir = fileparts(mfilename('fullpath'));
-package_root = fullfile(script_dir, '..');
-model_path = fullfile(package_root, 'model', [model_name '.slx']);
+scripts_root = fullfile(script_dir, '..');
+project_root = fullfile(scripts_root, '..');
+model_path = fullfile(project_root, 'controllers', controller_type, [model_name '.slx']);
 
 colors = [
     0.0000, 0.0000, 0.0000;  % P1: 黑色
@@ -79,13 +75,13 @@ legend_fontsize = 11;            % 圖例字體大小
 ENABLE_PLOT = true;
 SAVE_PNG = true;
 SAVE_MAT = true;
-output_dir = 'test_results';
+output_dir = fullfile('test_results', controller_type);
 
 %% SECTION 2: 初始化與驗證
 
 fprintf('\n');
 fprintf('════════════════════════════════════════════════════════════\n');
-fprintf('           R Controller 自動化測試\n');
+fprintf('           PI Controller 自動化測試\n');
 fprintf('════════════════════════════════════════════════════════════\n');
 fprintf('\n');
 
@@ -117,11 +113,13 @@ if strcmpi(signal_type_name, 'sine')
 else
     fprintf('  StepTime: %.3f s\n', StepTime);
 end
+fprintf('  Kp: %.2f\n', Kp_value);
+fprintf('  Ki: %.2f\n', Ki_value);
 fprintf('\n');
 
 % 創建輸出目錄
 if SAVE_PNG || SAVE_MAT
-    output_dir = fullfile(package_root, output_dir);
+    output_dir = fullfile(project_root, output_dir);
     if ~exist(output_dir, 'dir')
         mkdir(output_dir);
     end
@@ -175,6 +173,17 @@ if ~bdIsLoaded(model_name)
 end
 fprintf('  ✓ 模型已開啟\n');
 
+% 設定 PI 參數為 workspace 變數
+fprintf('  正在配置 PI 控制器參數...\n');
+for ch = 1:6
+    pi_block = sprintf('%s/PI controller/PI_Ch%d', model_name, ch);
+    set_param(pi_block, 'P', 'Kp_value');
+    set_param(pi_block, 'I', 'Ki_value');
+end
+fprintf('  ✓ PI 參數已配置為 workspace 變數\n');
+fprintf('    - Kp: %.2f\n', Kp_value);
+fprintf('    - Ki: %.2f\n', Ki_value);
+
 % 設定模擬器參數
 set_param(model_name, 'StopTime', num2str(sim_time));
 set_param(model_name, 'Solver', solver);
@@ -214,7 +223,6 @@ try
     Vm_data = out.Vm;
     e_data = out.e;
     u_data = out.u;
-    w1_hat_data = out.w1_hat;
 
     % 根據採樣率生成時間軸（與數據同步）
     N = size(Vd_data, 1);
@@ -225,7 +233,6 @@ try
     fprintf('  ✓ Vm: [%d × %d]\n', size(Vm_data, 1), size(Vm_data, 2));
     fprintf('  ✓ e: [%d × %d]\n', size(e_data, 1), size(e_data, 2));
     fprintf('  ✓ u: [%d × %d]\n', size(u_data, 1), size(u_data, 2));
-    fprintf('  ✓ w1_hat: [%d × %d]\n', size(w1_hat_data, 1), size(w1_hat_data, 2));
 catch ME
     error('數據提取失敗: %s', ME.message);
 end
@@ -316,6 +323,103 @@ if strcmpi(signal_type_name, 'sine')
         fprintf('   P%d   |  %6.2f%%   |  %+7.2f°%s\n', ...
                 ch, magnitude_ratio(ch)*100, phase_lag(ch), marker);
     end
+    fprintf('\n');
+end
+
+%% SECTION 7.5: 性能指標計算（Step 模式）
+
+if strcmpi(signal_type_name, 'step')
+    fprintf('【性能指標計算】\n');
+    fprintf('────────────────────────\n');
+    fprintf('  激發通道: P%d\n', Channel);
+    fprintf('  目標振幅: %.4f V\n\n', Amplitude);
+
+    % === 提取激發通道數據 ===
+    Vm_ch = Vm_data(:, Channel);
+    e_ch = e_data(:, Channel);
+
+    % === 1. 計算穩態值 ===
+    % 使用最後 100ms 的平均值作為穩態值
+    settling_window = 0.1;  % 100 ms
+    n_samples_window = round(settling_window / Ts);
+    final_value = mean(Vm_ch(end-n_samples_window:end));
+
+    % === 2. 穩態誤差 (Steady-State Error) ===
+    % 使用最後 100ms 的平均絕對誤差
+    sse = mean(abs(e_ch(end-n_samples_window:end)));
+    sse_percent = (sse / abs(Amplitude)) * 100;
+
+    % === 3. 上升時間 (Rise Time, 10% to 90%) ===
+    level_10 = final_value * 0.1;
+    level_90 = final_value * 0.9;
+
+    idx_10 = find(Vm_ch >= level_10, 1, 'first');
+    idx_90 = find(Vm_ch >= level_90, 1, 'first');
+
+    if ~isempty(idx_10) && ~isempty(idx_90) && idx_90 > idx_10
+        rise_time = t(idx_90) - t(idx_10);
+    else
+        rise_time = NaN;
+    end
+
+    % === 4. 安定時間 (Settling Time, 2% band) ===
+    settling_band = 0.02;  % ±2%
+    upper_bound = final_value * (1 + settling_band);
+    lower_bound = final_value * (1 - settling_band);
+
+    outside_band = (Vm_ch > upper_bound) | (Vm_ch < lower_bound);
+    last_violation_idx = find(outside_band, 1, 'last');
+
+    if isempty(last_violation_idx)
+        settling_time = 0;  % 一直在範圍內
+    else
+        settling_time = t(last_violation_idx);
+    end
+
+    % === 5. 最大超越量 (Maximum Overshoot) ===
+    % 只看 StepTime 之後的數據
+    idx_after_step = t >= StepTime;
+    t_after = t(idx_after_step);
+    Vm_after = Vm_ch(idx_after_step);
+
+    [peak_value, peak_idx_rel] = max(Vm_after);
+    peak_idx = find(idx_after_step, 1, 'first') + peak_idx_rel - 1;
+    peak_time = t(peak_idx);
+
+    if final_value ~= 0
+        overshoot_percent = ((peak_value - final_value) / abs(final_value)) * 100;
+    else
+        overshoot_percent = 0;
+    end
+
+    % 如果沒有超越（peak < final），設為 0
+    if overshoot_percent < 0
+        overshoot_percent = 0;
+    end
+
+    % === 顯示結果 ===
+    fprintf('  時域響應特性:\n');
+    fprintf('    ├─ 穩態值:                  %.6f V\n', final_value);
+    fprintf('    ├─ 安定時間 (2%% band):      %.4f s (%.2f ms)\n', ...
+            settling_time, settling_time*1000);
+    fprintf('    ├─ 最大超越量:              %.2f %% (峰值: %.6f V)\n', ...
+            overshoot_percent, peak_value);
+    fprintf('    └─ 穩態誤差 (SSE):          %.6f V (%.4f %%)\n', ...
+            sse, sse_percent);
+
+    % === 保存到結構 ===
+    performance.channel = Channel;
+    performance.target_value = Amplitude;
+    performance.final_value = final_value;
+    performance.rise_time = rise_time;
+    performance.peak_time = peak_time;
+    performance.peak_value = peak_value;
+    performance.settling_time_2pct = settling_time;
+    performance.settling_band = settling_band;
+    performance.overshoot_percent = overshoot_percent;
+    performance.sse = sse;
+    performance.sse_percent = sse_percent;
+
     fprintf('\n');
 end
 
@@ -459,7 +563,6 @@ if ENABLE_PLOT
         % 選取數據
         idx_detail = (t >= t_start_detail) & (t <= t_end_detail);
         t_detail = t(idx_detail);
-        w1_hat_detail = w1_hat_data(idx_detail, :);
         u_detail = u_data(idx_detail, :);
         e_detail = e_data(idx_detail, :);
 
@@ -468,33 +571,9 @@ if ENABLE_PLOT
         fprintf('  📊 詳細分析窗口: %.4f - %.4f s (%.1f 個週期, %d 點)\n', ...
                 t_start_detail, t_end_detail, actual_cycles, sum(idx_detail));
 
-        % === 圖 4: W1_hat 估測值 (最後 10 個週期) ===
-        fig4 = figure('Name', sprintf('W1_hat Estimation (Last %d cycles)', detail_cycles), ...
+        % === 圖 4: 控制輸入 u (最後 10 個週期) ===
+        fig4 = figure('Name', sprintf('Control Input u (Last %d cycles)', detail_cycles), ...
                       'Position', [250, 250, 1200, 800]);
-
-        for ch = 1:6
-            subplot(2, 3, ch);
-
-            plot(t_detail*1000, w1_hat_detail(:, ch), '-', ...
-                 'Color', colors(ch, :), 'LineWidth', measurement_linewidth);
-
-            grid on;
-            xlabel('Time (ms)', 'FontSize', xlabel_fontsize-2, 'FontWeight', 'bold');
-            ylabel('W1_{hat} (V)', 'FontSize', ylabel_fontsize-2, 'FontWeight', 'bold');
-            title(sprintf('P%d', ch), 'FontSize', title_fontsize-2, 'FontWeight', 'bold');
-
-            % 設定座標軸格式
-            ax = gca;
-            ax.LineWidth = axis_linewidth;
-            ax.FontSize = tick_fontsize-1;
-            ax.FontWeight = 'bold';
-        end
-
-        fprintf('  ✓ Figure 4: W1_hat Estimation (Last %d cycles)\n', detail_cycles);
-
-        % === 圖 5: 控制輸入 u (最後 10 個週期) ===
-        fig5 = figure('Name', sprintf('Control Input u (Last %d cycles)', detail_cycles), ...
-                      'Position', [300, 300, 1200, 800]);
 
         for ch = 1:6
             subplot(2, 3, ch);
@@ -514,11 +593,11 @@ if ENABLE_PLOT
             ax.FontWeight = 'bold';
         end
 
-        fprintf('  ✓ Figure 5: Control Input u (Last %d cycles)\n', detail_cycles);
+        fprintf('  ✓ Figure 4: Control Input u (Last %d cycles)\n', detail_cycles);
 
-        % === 圖 6: 追蹤誤差 e (最後 10 個週期) ===
-        fig6 = figure('Name', sprintf('Tracking Error e (Last %d cycles)', detail_cycles), ...
-                      'Position', [350, 350, 1200, 800]);
+        % === 圖 5: 追蹤誤差 e (最後 10 個週期) ===
+        fig5 = figure('Name', sprintf('Tracking Error e (Last %d cycles)', detail_cycles), ...
+                      'Position', [300, 300, 1200, 800]);
 
         for ch = 1:6
             subplot(2, 3, ch);
@@ -538,38 +617,44 @@ if ENABLE_PLOT
             ax.FontWeight = 'bold';
         end
 
-        fprintf('  ✓ Figure 6: Tracking Error e (Last %d cycles)\n', detail_cycles);
+        fprintf('  ✓ Figure 5: Tracking Error e (Last %d cycles)\n', detail_cycles);
 
     else
         % === Step 模式繪圖 ===
 
-        % 選取從 2ms 開始的數據
-        idx_step = t >= 0.002;
-        t_step = t(idx_step);
-        Vm_step = Vm_data(idx_step, :);
-        Vd_step = Vd_data(idx_step, :);
-        e_step = e_data(idx_step, :);
-        u_step = u_data(idx_step, :);
-        w1_hat_step = w1_hat_data(idx_step, :);
+        % 使用完整時間段的數據
+        t_step_full = t;
+        Vm_step_full = Vm_data;
+        Vd_step_full = Vd_data;
+        e_step_full = e_data;
+        u_step_full = u_data;
 
-        % 圖 1: 6 通道響應
-        fig1 = figure('Name', 'Step Response - 6 Channels', ...
+        % 選取 0~10ms 的數據用於 Vm 和 e 圖
+        zoom_time = 0.01;  % 10 ms
+        idx_zoom = t <= zoom_time;
+        t_zoom = t(idx_zoom);
+        Vm_zoom = Vm_data(idx_zoom, :);
+        Vd_zoom = Vd_data(idx_zoom, :);
+        e_zoom = e_data(idx_zoom, :);
+
+        % 圖 1: 6 通道響應 (0~10ms)
+        fig1 = figure('Name', 'Step Response - 6 Channels (0-10ms)', ...
                       'Position', [100, 100, 1200, 800]);
 
         for ch = 1:6
             subplot(2, 3, ch);
 
             % Measurement (實線)
-            plot(t_step, Vm_step(:, ch), '-', 'Color', colors(ch, :), ...
+            plot(t_zoom*1000, Vm_zoom(:, ch), '-', 'Color', colors(ch, :), ...
                  'LineWidth', measurement_linewidth);
             hold on;
 
             % Reference (虛線)
-            plot(t_step, Vd_step(:, ch), '--', 'Color', [0, 0, 0], ...
+            plot(t_zoom*1000, Vd_zoom(:, ch), '--', 'Color', [0, 0, 0], ...
                  'LineWidth', reference_linewidth);
 
             grid on;
-            xlabel('Time (s)', 'FontSize', xlabel_fontsize-2, 'FontWeight', 'bold');
+            xlabel('Time (ms)', 'FontSize', xlabel_fontsize-2, 'FontWeight', 'bold');
             ylabel('HsVm (V)', 'FontSize', ylabel_fontsize-2, 'FontWeight', 'bold');
             title(sprintf('P%d', ch), 'FontSize', title_fontsize-2, 'FontWeight', 'bold');
 
@@ -586,22 +671,22 @@ if ENABLE_PLOT
             end
         end
 
-        fprintf('  ✓ Figure 1: Step Response\n');
+        fprintf('  ✓ Figure 1: Step Response (0-10ms)\n');
 
-        % 圖 2: 誤差分析
-        fig2 = figure('Name', 'Error Analysis', ...
+        % 圖 2: 誤差分析 (0~10ms)
+        fig2 = figure('Name', 'Error Analysis (0-10ms)', ...
                       'Position', [150, 150, 1000, 600]);
 
         for ch = 1:6
-            plot(t_step, e_step(:, ch), 'Color', colors(ch, :), ...
+            plot(t_zoom*1000, e_zoom(:, ch), 'Color', colors(ch, :), ...
                  'LineWidth', measurement_linewidth);
             hold on;
         end
 
         grid on;
-        xlabel('Time (s)', 'FontSize', xlabel_fontsize, 'FontWeight', 'bold');
+        xlabel('Time (ms)', 'FontSize', xlabel_fontsize, 'FontWeight', 'bold');
         ylabel('Error (V)', 'FontSize', ylabel_fontsize, 'FontWeight', 'bold');
-        title('Tracking Error', 'FontSize', title_fontsize, 'FontWeight', 'bold');
+        title('Tracking Error (0-10ms)', 'FontSize', title_fontsize, 'FontWeight', 'bold');
         legend({'P1', 'P2', 'P3', 'P4', 'P5', 'P6'}, ...
                'Location', 'best', 'FontSize', legend_fontsize, 'FontWeight', 'bold');
 
@@ -611,14 +696,14 @@ if ENABLE_PLOT
         ax.FontSize = tick_fontsize;
         ax.FontWeight = 'bold';
 
-        fprintf('  ✓ Figure 2: Error Analysis\n');
+        fprintf('  ✓ Figure 2: Error Analysis (0-10ms)\n');
 
-        % 圖 3: 控制輸入
+        % 圖 3: 控制輸入 (完整時間)
         fig3 = figure('Name', 'Control Input', ...
                       'Position', [200, 200, 1000, 600]);
 
         for ch = 1:6
-            plot(t_step, u_step(:, ch), 'Color', colors(ch, :), ...
+            plot(t_step_full, u_step_full(:, ch), 'Color', colors(ch, :), ...
                  'LineWidth', measurement_linewidth);
             hold on;
         end
@@ -637,30 +722,6 @@ if ENABLE_PLOT
         ax.FontWeight = 'bold';
 
         fprintf('  ✓ Figure 3: Control Input\n');
-
-        % 圖 4: W1_hat 估測值
-        fig4 = figure('Name', 'W1_hat Estimation', ...
-                      'Position', [250, 250, 1200, 800]);
-
-        for ch = 1:6
-            subplot(2, 3, ch);
-
-            plot(t_step, w1_hat_step(:, ch), '-', ...
-                 'Color', colors(ch, :), 'LineWidth', measurement_linewidth);
-
-            grid on;
-            xlabel('Time (s)', 'FontSize', xlabel_fontsize-2, 'FontWeight', 'bold');
-            ylabel('W1_{hat} (V)', 'FontSize', ylabel_fontsize-2, 'FontWeight', 'bold');
-            title(sprintf('P%d', ch), 'FontSize', title_fontsize-2, 'FontWeight', 'bold');
-
-            % 設定座標軸格式
-            ax = gca;
-            ax.LineWidth = axis_linewidth;
-            ax.FontSize = tick_fontsize-1;
-            ax.FontWeight = 'bold';
-        end
-
-        fprintf('  ✓ Figure 4: W1_hat Estimation\n');
     end
 
     fprintf('\n');
@@ -678,14 +739,12 @@ if SAVE_PNG || SAVE_MAT
             saveas(fig1, fullfile(test_dir, 'Vm_Vd.png'));
             saveas(fig2, fullfile(test_dir, '6ch_time_response.png'));
             saveas(fig3, fullfile(test_dir, 'full_response.png'));
-            saveas(fig4, fullfile(test_dir, 'w1_hat_estimation_1-100ms.png'));
-            saveas(fig5, fullfile(test_dir, 'control_input_u_1-100ms.png'));
-            saveas(fig6, fullfile(test_dir, 'tracking_error_e_1-100ms.png'));
+            saveas(fig4, fullfile(test_dir, 'control_input_u.png'));
+            saveas(fig5, fullfile(test_dir, 'tracking_error_e.png'));
         else
             saveas(fig1, fullfile(test_dir, 'step_response_6ch.png'));
             saveas(fig2, fullfile(test_dir, 'error_analysis.png'));
             saveas(fig3, fullfile(test_dir, 'control_input.png'));
-            saveas(fig4, fullfile(test_dir, 'w1_hat_estimation.png'));
         end
         fprintf('  ✓ Figures saved (.png)\n');
     end
@@ -698,6 +757,8 @@ if SAVE_PNG || SAVE_MAT
         result.config.SignalType = SignalType;
         result.config.Channel = Channel;
         result.config.Amplitude = Amplitude;
+        result.config.Kp = Kp_value;
+        result.config.Ki = Ki_value;
         result.config.sim_time = sim_time;
         result.config.Ts = Ts;
 
@@ -714,12 +775,18 @@ if SAVE_PNG || SAVE_MAT
         result.data.Vm = Vm_data;
         result.data.e = e_data;
         result.data.u = u_data;
-        result.data.w1_hat = w1_hat_data;
 
         if strcmpi(signal_type_name, 'sine')
             result.display.t = t_display;
             result.display.Vd = Vd_display;
             result.display.Vm = Vm_display;
+
+            result.analysis.magnitude_ratio = magnitude_ratio;
+            result.analysis.phase_lag = phase_lag;
+            result.analysis.excited_freq = Frequency;
+        else
+            % Step 模式：保存性能指標
+            result.performance = performance;
         end
 
         result.meta.timestamp = datestr(now);
@@ -745,6 +812,7 @@ fprintf('  信號: %s, P%d, %.3f V\n', signal_type_name, Channel, Amplitude);
 if strcmpi(signal_type_name, 'sine')
     fprintf('  頻率: %.1f Hz\n', Frequency);
 end
+fprintf('  PI 參數: Kp=%.2f, Ki=%.2f\n', Kp_value, Ki_value);
 fprintf('  執行時間: %.2f 秒\n', elapsed_time);
 
 fprintf('\n');
