@@ -37,9 +37,6 @@ desktop.ini
 .vscode/
 .idea/
 
-# Claude Code workspace
-.claude/
-
 # Test results (comment out if you want to track these)
 test_results/
 
