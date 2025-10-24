@@ -25,14 +25,15 @@ project_root = fullfile(scripts_root, '..');
 addpath(fullfile(scripts_root, 'common'));
 addpath(fullfile(project_root, 'controllers', 'pi_controller'));
 
-% 頻率向量（低頻對數 + 高頻線性）
-freq_low = logspace(0, 2, 5);           % 1~100 Hz, 8 點 (對數分布)
-freq_high = linspace(100, 1500, 20);    % 100~1000 Hz, 20 點 (線性分布)
-frequencies = unique(sort([freq_low, freq_high]));  % 合併並排序去重
+% 頻率向量（使用 100,000 Hz 的因數，確保零 round() 誤差）
+% 所有頻率都能產生整數的 samples_per_cycle，避免相位漂移問題
+frequencies = [1, 5, 10, 20, 50, 100, ...        % 低頻段 (1-100 Hz): 6點
+               125, 200, 250, 400, 500, ...      % 中頻段 (100-500 Hz): 5點
+               625, 800, 1000, 1250, 2000];      % 高頻段 (500-2000 Hz): 5點
 
 % Vd Generator 設定
 signal_type_name = 'sine';
-Channel = 1;              % 激發通道 (1-6)，可自由設定
+Channel = 5;              % 激發通道 (1-6)，可自由設定
 Amplitude = 0.5;          % 振幅 [V]
 Phase = 0;                % 相位 [deg]
 SignalType = 1;           % Sine mode
@@ -48,15 +49,21 @@ solver = 'ode5';          % 固定步長 solver
 StepTime = 0;             % Step 時間（不使用）
 
 % 模擬時間設定
-total_cycles = 90;        % 總週期數（50 暫態 + 40 穩態）
-skip_cycles = 50;         % 跳過暫態週期數
+total_cycles = 120;       % 
+skip_cycles = 80;         % 跳過暫態週期數（從 50 增加到 80）
 fft_cycles = 40;          % FFT 分析週期數
 min_sim_time = 0.1;       % 最小模擬時間 [s]（高頻用）
 max_sim_time = Inf;       % 最大模擬時間 [s]（不設限）
 
+% 品質檢測參數
+steady_state_threshold = 0.02;  % 穩態檢測閾值 (1% of Amplitude)
+thd_threshold = 1.0;            % THD 閾值 (1%)
+dc_tolerance = 0.01;            % DC 值容忍度 (1% of Amplitude)
+
 % 輸出設定
-output_dir = fullfile(project_root, 'test_results', 'pi_controller', 'frequency_response');
 test_timestamp = datestr(now, 'yyyymmdd_HHMMSS');
+test_folder_name = sprintf('ch%d_%s', Channel, test_timestamp);
+output_dir = fullfile(project_root, 'test_results', 'pi_controller', 'frequency_response', test_folder_name);
 
 % 模型設定
 model_name = 'PI_Controller_Integrated';
@@ -68,9 +75,10 @@ model_path = fullfile(project_root, 'controllers', controller_type, [model_name 
 fprintf('【測試配置】\n');
 fprintf('────────────────────────\n');
 fprintf('  頻率範圍: %.1f Hz ~ %.1f kHz\n', frequencies(1), frequencies(end)/1000);
-fprintf('  頻率點數: %d 點\n', length(frequencies));
-fprintf('    低頻段 (1-100 Hz): 對數分布\n');
-fprintf('    高頻段 (100-2000 Hz): 線性分布\n');
+fprintf('  頻率點數: %d 點（所有頻率均為 100kHz 的因數，確保零 round() 誤差）\n', length(frequencies));
+fprintf('    低頻段 (1-100 Hz): 6 點\n');
+fprintf('    中頻段 (100-500 Hz): 5 點\n');
+fprintf('    高頻段 (500-2000 Hz): 5 點\n');
 fprintf('  激發通道: P%d\n', Channel);
 fprintf('  振幅: %.2f V\n', Amplitude);
 fprintf('  PI 參數: Kp=%.2f, Ki=%.2f (zc=%.0f)\n', Kp_value, Ki_value, zc);
@@ -124,6 +132,19 @@ num_freq = length(frequencies);
 magnitude_ratio_all = zeros(num_freq, 6);
 phase_lag_all = zeros(num_freq, 6);
 sim_times = zeros(num_freq, 1);
+
+% 初始化品質檢測結果矩陣
+quality_steady_state = true(num_freq, 6);  % 穩態檢測結果
+quality_thd = zeros(num_freq, 6);          % THD 值 (%)
+quality_dc_error = zeros(num_freq, 6);     % DC 誤差 (V)
+quality_thd_pass = true(num_freq, 6);      % THD 檢測通過
+quality_dc_pass = true(num_freq, 6);       % DC 檢測通過
+
+% 創建診斷圖目錄
+diagnostic_dir = fullfile(output_dir, 'diagnostics');
+if ~exist(diagnostic_dir, 'dir')
+    mkdir(diagnostic_dir);
+end
 
 % 頻率掃描
 for freq_idx = 1:num_freq
@@ -193,6 +214,155 @@ for freq_idx = 1:num_freq
     fprintf('  ✓ 穩態數據選取: %.2f ~ %.2f s (%.1f 個週期, %d 點)\n', ...
             t_start, t_end, actual_cycles, sum(idx_steady));
 
+    %% ========== 新增：品質檢測 ==========
+
+    % === 1. 穩態檢測：檢查週期重複性 ===
+    fprintf('  🔍 執行品質檢測...\n');
+
+    samples_per_cycle = round(period / Ts);
+    num_cycles_to_check = min(fft_cycles, floor(length(t_steady) / samples_per_cycle));
+
+    for ch = 1:6
+        % 提取每個週期的數據
+        cycle_diffs = [];
+
+        for k = 2:num_cycles_to_check
+            idx_start_prev = (k-2) * samples_per_cycle + 1;
+            idx_end_prev = (k-1) * samples_per_cycle;
+            idx_start_curr = (k-1) * samples_per_cycle + 1;
+            idx_end_curr = k * samples_per_cycle;
+
+            if idx_end_curr <= length(Vm_steady(:, ch))
+                cycle_prev = Vm_steady(idx_start_prev:idx_end_prev, ch);
+                cycle_curr = Vm_steady(idx_start_curr:idx_end_curr, ch);
+
+                % 計算相鄰週期的最大差異
+                max_diff = max(abs(cycle_curr - cycle_prev));
+                cycle_diffs = [cycle_diffs; max_diff];
+            end
+        end
+
+        % 判斷穩態（所有週期差異都要小於閾值）
+        threshold = steady_state_threshold * Amplitude;
+        if ~isempty(cycle_diffs)
+            quality_steady_state(freq_idx, ch) = all(cycle_diffs < threshold);
+
+            % 如果未達穩態，保存診斷圖
+            if ~quality_steady_state(freq_idx, ch)
+                % 生成週期疊圖
+                fig_diag = figure('Visible', 'off', 'Position', [100, 100, 800, 600]);
+                hold on; grid on;
+
+                for k = 1:num_cycles_to_check
+                    idx_start = (k-1) * samples_per_cycle + 1;
+                    idx_end = k * samples_per_cycle;
+
+                    if idx_end <= length(Vm_steady(:, ch))
+                        cycle_data = Vm_steady(idx_start:idx_end, ch);
+                        t_cycle = (0:length(cycle_data)-1)' * Ts * 1000;  % ms
+
+                        % 使用顏色漸層表示時間順序
+                        color_intensity = (k-1) / (num_cycles_to_check-1);
+                        plot(t_cycle, cycle_data, 'LineWidth', 1.5, ...
+                             'Color', [color_intensity, 0, 1-color_intensity]);
+                    end
+                end
+
+                xlabel('Time within Cycle [ms]', 'FontSize', 12, 'FontWeight', 'bold');
+                ylabel('Vm [V]', 'FontSize', 12, 'FontWeight', 'bold');
+                title(sprintf('Cycle Overlay - %.1f Hz, P%d (NOT STEADY)', Frequency, ch), ...
+                      'FontSize', 14, 'FontWeight', 'bold', 'Color', 'r');
+
+                % 添加圖例說明
+                colormap(jet(num_cycles_to_check));
+                cb = colorbar;
+                cb.Label.String = 'Cycle Number';
+                caxis([1, num_cycles_to_check]);
+
+                % 保存診斷圖
+                diag_filename = sprintf('steady_fail_%.1fHz_P%d.png', Frequency, ch);
+                saveas(fig_diag, fullfile(diagnostic_dir, diag_filename));
+                close(fig_diag);
+            end
+        else
+            quality_steady_state(freq_idx, ch) = false;
+        end
+    end
+
+    % === 2. THD 和 DC 值檢測 ===
+    fs = 1 / Ts;
+
+    for ch = 1:6
+        % FFT 分析（用於 DC 檢測）
+        Vm_fft_temp = fft(Vm_steady(:, ch));
+        N_fft_temp = length(Vm_fft_temp);
+
+        % DC 成分
+        DC_value = abs(Vm_fft_temp(1)) / N_fft_temp;
+        DC_target = 0;  % 純正弦波應該沒有 DC
+        quality_dc_error(freq_idx, ch) = abs(DC_value - DC_target);
+        quality_dc_pass(freq_idx, ch) = (quality_dc_error(freq_idx, ch) < dc_tolerance * Amplitude);
+
+        % THD 計算
+        try
+            thd_dB = thd(Vm_steady(:, ch), fs, 10);
+            thd_percent = 10^(thd_dB/20) * 100;
+            quality_thd(freq_idx, ch) = thd_percent;
+            quality_thd_pass(freq_idx, ch) = (thd_percent < thd_threshold);
+        catch
+            % 如果 THD 計算失敗（信號太差）
+            quality_thd(freq_idx, ch) = NaN;
+            quality_thd_pass(freq_idx, ch) = false;
+        end
+    end
+
+    % === 3. 顯示品質檢測結果 ===
+    fprintf('  ✓ 品質檢測完成\n');
+    fprintf('    通道 | 穩態 | THD     | DC誤差  | 狀態\n');
+    fprintf('    ─────┼──────┼─────────┼─────────┼──────\n');
+
+    for ch = 1:6
+        steady_mark = '✓';
+        if ~quality_steady_state(freq_idx, ch)
+            steady_mark = '✗';
+        end
+
+        thd_mark = '✓';
+        if ~quality_thd_pass(freq_idx, ch)
+            thd_mark = '✗';
+        end
+
+        dc_mark = '✓';
+        if ~quality_dc_pass(freq_idx, ch)
+            dc_mark = '✗';
+        end
+
+        % 整體狀態判斷
+        if ch == Channel
+            % 激勵通道：必須全部通過
+            if quality_steady_state(freq_idx, ch) && quality_thd_pass(freq_idx, ch) && quality_dc_pass(freq_idx, ch)
+                status = 'PASS';
+            else
+                status = 'WARN';
+            end
+        else
+            % 其他通道：標記但不影響 FFT
+            if quality_steady_state(freq_idx, ch) && quality_thd_pass(freq_idx, ch) && quality_dc_pass(freq_idx, ch)
+                status = 'OK';
+            else
+                status = 'FAIL';
+            end
+        end
+
+        fprintf('     P%d  |  %s   | %5.2f%% %s | %.4fV %s | %s\n', ...
+                ch, steady_mark, quality_thd(freq_idx, ch), thd_mark, ...
+                quality_dc_error(freq_idx, ch), dc_mark, status);
+    end
+
+    fprintf('\n');
+
+    %% ========== 品質檢測結束 ==========
+
     % FFT 分析
     fprintf('  📊 執行 FFT 分析...\n');
 
@@ -244,6 +414,13 @@ results.Kp = Kp_value;
 results.Ki = Ki_value;
 results.zc = zc;
 
+% 品質檢測結果
+results.quality.steady_state = quality_steady_state;
+results.quality.thd = quality_thd;
+results.quality.dc_error = quality_dc_error;
+results.quality.thd_pass = quality_thd_pass;
+results.quality.dc_pass = quality_dc_pass;
+
 fprintf('════════════════════════════════════════════════════════════\n');
 fprintf('  頻率掃描完成！\n');
 fprintf('════════════════════════════════════════════════════════════\n');
@@ -291,14 +468,26 @@ for ch = 1:6
     end
 end
 
-% === 計算並標註 -3dB 頻寬點 ===
+% === 計算並標註 -3dB 頻寬點（修正版）===
 mag_dB_excited = results.magnitude_dB(:, Channel);
-idx_3dB = find(mag_dB_excited < -3, 1, 'first');
 
-if ~isempty(idx_3dB) && idx_3dB > 1
-    % 找到 -3dB 點
-    f_3dB = frequencies(idx_3dB);
-    mag_3dB = magnitude_ratio(idx_3dB, Channel);
+% 找到第一個 < -3dB 的點
+idx_below_3dB = find(mag_dB_excited < -3, 1, 'first');
+
+if ~isempty(idx_below_3dB) && idx_below_3dB > 1
+    % 用線性內插找精確的 -3dB 頻率
+    idx_above = idx_below_3dB - 1;  % -3dB 之前的點（> -3dB）
+    idx_below = idx_below_3dB;       % -3dB 之後的點（< -3dB）
+
+    % 提取兩點的數據
+    f1 = frequencies(idx_above);
+    f2 = frequencies(idx_below);
+    mag_dB1 = mag_dB_excited(idx_above);
+    mag_dB2 = mag_dB_excited(idx_below);
+
+    % 線性內插（對數頻率軸用線性內插）
+    f_3dB = f1 + (f2 - f1) * (-3 - mag_dB1) / (mag_dB2 - mag_dB1);
+    mag_3dB = 10^(-3/20);  % -3dB 對應的線性增益 = 0.7079
 
     % 標註 -3dB 點（使用淺灰色圓圈，不突兀）
     semilogx(f_3dB, mag_3dB, 'o', ...
@@ -357,6 +546,53 @@ set(gca, 'FontSize', 11, 'FontWeight', 'bold');
 fprintf('  ✓ Bode Plot 完成\n');
 fprintf('\n');
 
+%% SECTION 4.5: 品質摘要圖
+
+fprintf('【生成品質摘要圖】\n');
+fprintf('────────────────────────\n');
+
+% === 圖 2: 品質摘要 Heatmap ===
+fig_quality = figure('Name', 'Quality Summary', 'Position', [200, 200, 1200, 800]);
+
+% 創建 3x1 子圖
+subplot(3, 1, 1);
+imagesc(quality_steady_state');
+colormap(gca, [1 0.8 0.8; 0.8 1 0.8]);  % 紅色=失敗, 綠色=通過
+colorbar('Ticks', [0, 1], 'TickLabels', {'Fail', 'Pass'});
+xlabel('Frequency Index', 'FontSize', 11, 'FontWeight', 'bold');
+ylabel('Channel', 'FontSize', 11, 'FontWeight', 'bold');
+title('Steady State Check', 'FontSize', 13, 'FontWeight', 'bold');
+set(gca, 'YTick', 1:6, 'YTickLabel', {'P1', 'P2', 'P3', 'P4', 'P5', 'P6'});
+set(gca, 'FontSize', 10, 'FontWeight', 'bold');
+
+subplot(3, 1, 2);
+imagesc(quality_thd');
+colorbar;
+caxis([0, max(5, max(quality_thd(:)))]);  % 顯示 0-5% 範圍
+xlabel('Frequency Index', 'FontSize', 11, 'FontWeight', 'bold');
+ylabel('Channel', 'FontSize', 11, 'FontWeight', 'bold');
+title('THD [%]', 'FontSize', 13, 'FontWeight', 'bold');
+set(gca, 'YTick', 1:6, 'YTickLabel', {'P1', 'P2', 'P3', 'P4', 'P5', 'P6'});
+set(gca, 'FontSize', 10, 'FontWeight', 'bold');
+colormap(gca, hot);
+
+subplot(3, 1, 3);
+imagesc(quality_dc_error' * 1000);  % 轉成 mV
+colorbar;
+caxis([0, max(10, max(quality_dc_error(:)*1000))]);  % 顯示 0-10mV 範圍
+xlabel('Frequency Index', 'FontSize', 11, 'FontWeight', 'bold');
+ylabel('Channel', 'FontSize', 11, 'FontWeight', 'bold');
+title('DC Error [mV]', 'FontSize', 13, 'FontWeight', 'bold');
+set(gca, 'YTick', 1:6, 'YTickLabel', {'P1', 'P2', 'P3', 'P4', 'P5', 'P6'});
+set(gca, 'FontSize', 10, 'FontWeight', 'bold');
+colormap(gca, hot);
+
+sgtitle(sprintf('Quality Summary - PI Controller (Ch P%d, Kp=%.2f, Ki=%.2f)', ...
+        Channel, Kp_value, Ki_value), 'FontSize', 15, 'FontWeight', 'bold');
+
+fprintf('  ✓ 品質摘要圖完成\n');
+fprintf('\n');
+
 %% SECTION 5: 分析與顯示結果
 
 fprintf('【頻率響應分析結果】\n');
@@ -368,11 +604,21 @@ fprintf('───────────────────────�
 
 mag_dB = results.magnitude_dB(:, Channel);
 
-% 找 -3dB 頻寬
-idx_3dB = find(mag_dB < -3, 1, 'first');
-if ~isempty(idx_3dB)
-    f_3dB = frequencies(idx_3dB);
-    fprintf('  -3dB 頻寬: %.2f Hz\n', f_3dB);
+% 找 -3dB 頻寬（修正版：使用內插）
+idx_below_3dB = find(mag_dB < -3, 1, 'first');
+if ~isempty(idx_below_3dB) && idx_below_3dB > 1
+    % 線性內插計算精確的 -3dB 頻率
+    idx_above = idx_below_3dB - 1;
+    f1 = frequencies(idx_above);
+    f2 = frequencies(idx_below_3dB);
+    mag_dB1 = mag_dB(idx_above);
+    mag_dB2 = mag_dB(idx_below_3dB);
+
+    f_3dB = f1 + (f2 - f1) * (-3 - mag_dB1) / (mag_dB2 - mag_dB1);
+    fprintf('  -3dB 頻寬: %.2f Hz (內插計算)\n', f_3dB);
+elseif ~isempty(idx_below_3dB)
+    % 第一個點就 < -3dB（異常）
+    fprintf('  -3dB 頻寬: < %.2f Hz (第一個測試點)\n', frequencies(1));
 else
     fprintf('  -3dB 頻寬: > %.2f Hz (未達到)\n', frequencies(end));
 end
@@ -399,27 +645,74 @@ fprintf('  平均相位: %.2f°\n', mean(phase_ch));
 fprintf('\n');
 fprintf('════════════════════════════════════════════════════════════\n');
 
+%% 品質統計報告
+fprintf('\n【品質檢測統計】\n');
+fprintf('════════════════════════════════════════════════════════════\n');
+
+% 統計各通道的通過率
+for ch = 1:6
+    steady_pass_count = sum(quality_steady_state(:, ch));
+    thd_pass_count = sum(quality_thd_pass(:, ch));
+    dc_pass_count = sum(quality_dc_pass(:, ch));
+
+    steady_pass_rate = steady_pass_count / num_freq * 100;
+    thd_pass_rate = thd_pass_count / num_freq * 100;
+    dc_pass_rate = dc_pass_count / num_freq * 100;
+
+    overall_pass = sum(quality_steady_state(:, ch) & quality_thd_pass(:, ch) & quality_dc_pass(:, ch));
+    overall_pass_rate = overall_pass / num_freq * 100;
+
+    fprintf('\n【P%d】\n', ch);
+    if ch == Channel
+        fprintf('  (激勵通道)\n');
+    end
+    fprintf('  穩態檢測通過率: %d/%d (%.1f%%)\n', steady_pass_count, num_freq, steady_pass_rate);
+    fprintf('  THD 檢測通過率: %d/%d (%.1f%%)\n', thd_pass_count, num_freq, thd_pass_rate);
+    fprintf('  DC 檢測通過率:  %d/%d (%.1f%%)\n', dc_pass_count, num_freq, dc_pass_rate);
+    fprintf('  整體通過率:     %d/%d (%.1f%%)\n', overall_pass, num_freq, overall_pass_rate);
+
+    % THD 統計
+    valid_thd = quality_thd(~isnan(quality_thd(:, ch)), ch);
+    if ~isempty(valid_thd)
+        fprintf('  THD 平均值: %.2f%% (最大: %.2f%%, 最小: %.2f%%)\n', ...
+                mean(valid_thd), max(valid_thd), min(valid_thd));
+    end
+
+    % DC 誤差統計
+    fprintf('  DC 誤差平均: %.4f V (最大: %.4f V)\n', ...
+            mean(quality_dc_error(:, ch)), max(quality_dc_error(:, ch)));
+end
+
+fprintf('\n════════════════════════════════════════════════════════════\n');
+
 %% SECTION 6: 保存結果
 
 fprintf('\n【保存結果】\n');
 fprintf('────────────────────────\n');
 
-% 檔案命名
-mat_filename = sprintf('freq_sweep_ch%d_%s.mat', Channel, test_timestamp);
-png_filename = sprintf('freq_sweep_ch%d_%s.png', Channel, test_timestamp);
+% 檔案命名（簡化，因為已經在專屬資料夾中）
+mat_filename = 'freq_sweep_data.mat';
+png_bode_filename = 'bode_plot.png';
+png_quality_filename = 'quality_summary.png';
 
 mat_path = fullfile(output_dir, mat_filename);
-png_path = fullfile(output_dir, png_filename);
+png_bode_path = fullfile(output_dir, png_bode_filename);
+png_quality_path = fullfile(output_dir, png_quality_filename);
 
 % 保存 .mat 檔案
 save(mat_path, 'results', '-v7.3');
 fprintf('  ✓ 數據已保存: %s\n', mat_filename);
 
-% 保存 .png 圖片
-saveas(fig, png_path);
-fprintf('  ✓ 圖片已保存: %s\n', png_filename);
+% 保存 Bode Plot
+saveas(fig, png_bode_path);
+fprintf('  ✓ Bode Plot 已保存: %s\n', png_bode_filename);
+
+% 保存品質摘要圖
+saveas(fig_quality, png_quality_path);
+fprintf('  ✓ 品質摘要圖已保存: %s\n', png_quality_filename);
 
 fprintf('\n  📁 所有檔案保存至: %s\n', output_dir);
+fprintf('  📁 診斷圖保存至: %s\n', diagnostic_dir);
 fprintf('\n');
 
 %% SECTION 7: 測試總結

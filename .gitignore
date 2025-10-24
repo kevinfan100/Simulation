@@ -10,11 +10,18 @@
 slprj/
 *.slxc
 
-# Simulation cache
+# Simulink backup and version files
+*.original
+*.backup
+*.bak
+*.r2016b
 *.r2023a
 *.r2023b
 *.r2024a
 *.r2024b
+
+# Simulink extracted model XML
+slx_extracted/
 
 # Temporary files
 *.tmp
@@ -30,6 +37,15 @@ desktop.ini
 .vscode/
 .idea/
 
+# Claude Code workspace
+.claude/
+
+# Test results (comment out if you want to track these)
+test_results/
+
+# Duplicate package directory (if kept for reference, uncomment below)
+# r_controller_package/
+
 # Documentation build artifacts
 docs/_build/
 *.pdf
@@ -38,3 +54,5 @@ docs/_build/
 !Flux_Control_*_model.pdf
 !Flux_Control_B_oldmodel_merged.pdf
 !Flux_Control_R_newmodel.pdf
+!reference/*.pdf
+!*/reference/*.pdf
