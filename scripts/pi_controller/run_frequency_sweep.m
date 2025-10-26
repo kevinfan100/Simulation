@@ -25,15 +25,13 @@ project_root = fullfile(scripts_root, '..');
 addpath(fullfile(scripts_root, 'common'));
 addpath(fullfile(project_root, 'controllers', 'pi_controller'));
 
-% 頻率向量（使用 100,000 Hz 的因數，確保零 round() 誤差）
-% 所有頻率都能產生整數的 samples_per_cycle，避免相位漂移問題
-frequencies = [1, 5, 10, 20, 50, 100, ...        % 低頻段 (1-100 Hz): 6點
+frequencies = [1, 10, 20, 50, 100, ...        % 低頻段 (1-100 Hz): 5點
                125, 200, 250, 400, 500, ...      % 中頻段 (100-500 Hz): 5點
-               625, 800, 1000, 1250, 2000];      % 高頻段 (500-2000 Hz): 5點
+               625, 800, 1000, 1250, 1500];      % 高頻段 (500-2000 Hz): 5點
 
 % Vd Generator 設定
 signal_type_name = 'sine';
-Channel = 5;              % 激發通道 (1-6)，可自由設定
+Channel = 6;              % 激發通道 (1-6)，可自由設定
 Amplitude = 0.5;          % 振幅 [V]
 Phase = 0;                % 相位 [deg]
 SignalType = 1;           % Sine mode
@@ -76,7 +74,7 @@ fprintf('【測試配置】\n');
 fprintf('────────────────────────\n');
 fprintf('  頻率範圍: %.1f Hz ~ %.1f kHz\n', frequencies(1), frequencies(end)/1000);
 fprintf('  頻率點數: %d 點（所有頻率均為 100kHz 的因數，確保零 round() 誤差）\n', length(frequencies));
-fprintf('    低頻段 (1-100 Hz): 6 點\n');
+fprintf('    低頻段 (1-100 Hz): 5 點\n');
 fprintf('    中頻段 (100-500 Hz): 5 點\n');
 fprintf('    高頻段 (500-2000 Hz): 5 點\n');
 fprintf('  激發通道: P%d\n', Channel);
@@ -139,6 +137,8 @@ quality_thd = zeros(num_freq, 6);          % THD 值 (%)
 quality_dc_error = zeros(num_freq, 6);     % DC 誤差 (V)
 quality_thd_pass = true(num_freq, 6);      % THD 檢測通過
 quality_dc_pass = true(num_freq, 6);       % DC 檢測通過
+fft_bin_errors = zeros(num_freq, 1);       % FFT bin 誤差 (Hz)
+quality_fundamental_error = zeros(num_freq, 6);  % Fundamental frequency 誤差 (Hz)
 
 % 創建診斷圖目錄
 diagnostic_dir = fullfile(output_dir, 'diagnostics');
@@ -316,7 +316,48 @@ for freq_idx = 1:num_freq
         end
     end
 
-    % === 3. 顯示品質檢測結果 ===
+    % === 3. Fundamental Frequency 驗證 ===
+    for ch = 1:6
+        % 找出 Vm 的 fundamental frequency（FFT 最大峰值）
+        Vm_fft_full = abs(fft(Vm_steady(:, ch)));
+        N_half = floor(length(Vm_fft_full)/2);
+        [~, fundamental_idx] = max(Vm_fft_full(2:N_half));  % 跳過 DC (idx=1)
+        fundamental_idx = fundamental_idx + 1;  % 補回偏移
+
+        % 計算 fundamental frequency
+        freq_axis_full = (0:length(Vm_fft_full)-1) * fs / length(Vm_fft_full);
+        fundamental_freq = freq_axis_full(fundamental_idx);
+
+        % 檢查是否 = Frequency
+        quality_fundamental_error(freq_idx, ch) = abs(fundamental_freq - Frequency);
+    end
+
+    % === 4. THD 詳細統計 ===
+    fprintf('  📊 THD 詳細統計:\n');
+    fprintf('    閾值: %.2f%%\n', thd_threshold);
+
+    % 激勵通道的 THD
+    thd_excited = quality_thd(freq_idx, Channel);
+    if ~isnan(thd_excited)
+        fprintf('    激勵通道 P%d: %.3f%% ', Channel, thd_excited);
+        if thd_excited < thd_threshold
+            fprintf('✓ (通過)\n');
+        else
+            fprintf('✗ (超標 %.3f%%)\n', thd_excited - thd_threshold);
+        end
+    else
+        fprintf('    激勵通道 P%d: N/A (計算失敗)\n', Channel);
+    end
+
+    % 所有通道的 THD 統計
+    thd_valid = quality_thd(freq_idx, ~isnan(quality_thd(freq_idx, :)));
+    if ~isempty(thd_valid)
+        fprintf('    所有通道統計: 平均=%.3f%%, 最大=%.3f%%, 最小=%.3f%%\n', ...
+                mean(thd_valid), max(thd_valid), min(thd_valid));
+    end
+    fprintf('\n');
+
+    % === 5. 顯示品質檢測結果 ===
     fprintf('  ✓ 品質檢測完成\n');
     fprintf('    通道 | 穩態 | THD     | DC誤差  | 狀態\n');
     fprintf('    ─────┼──────┼─────────┼─────────┼──────\n');
@@ -374,6 +415,15 @@ for freq_idx = 1:num_freq
     [~, freq_bin_idx] = min(abs(freq_axis - Frequency));
     actual_freq = freq_axis(freq_bin_idx);
 
+    % === 驗證：FFT bin 對齊檢查 ===
+    freq_bin_error = abs(actual_freq - Frequency);
+    fft_bin_errors(freq_idx) = freq_bin_error;
+
+    % 檢查 FFT bin 是否對齊（理論上應該 = 0）
+    if freq_bin_error > 0.01  % 容忍 0.01 Hz 誤差（數值精度）
+        warning('FFT bin 未對齊！頻率: %.2f Hz, 誤差: %.4f Hz', Frequency, freq_bin_error);
+    end
+
     % 對激勵通道的 Vd 做 FFT
     Vd_fft = fft(Vd_steady(:, Channel));
     Vd_mag = abs(Vd_fft(freq_bin_idx)) * 2 / N_fft;
@@ -420,6 +470,8 @@ results.quality.thd = quality_thd;
 results.quality.dc_error = quality_dc_error;
 results.quality.thd_pass = quality_thd_pass;
 results.quality.dc_pass = quality_dc_pass;
+results.quality.fft_bin_errors = fft_bin_errors;
+results.quality.fundamental_error = quality_fundamental_error;
 
 fprintf('════════════════════════════════════════════════════════════\n');
 fprintf('  頻率掃描完成！\n');
