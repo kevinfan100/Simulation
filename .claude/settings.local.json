@@ -8,7 +8,9 @@
       "Bash(done)",
       "Bash(for branch in controller/pi controller/r develop master refactor-backup-20251016)",
       "Bash(mkdir:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
