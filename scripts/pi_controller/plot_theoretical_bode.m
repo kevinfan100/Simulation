@@ -314,16 +314,17 @@ if SAVE_RESULTS
     fprintf('\n【保存結果】\n');
     fprintf('────────────────────────\n');
 
-    % 輸出目錄
-    output_dir = fullfile(project_root, 'test_results', 'pi_controller', 'theoretical_bode');
+    % 輸出目錄（每次測試建立專屬資料夾）
+    timestamp = datestr(now, 'yyyymmdd_HHMMSS');
+    output_dir_base = fullfile(project_root, 'test_results', 'pi_controller', 'theoretical_bode');
+    output_dir = fullfile(output_dir_base, sprintf('bode_%s', timestamp));
+
     if ~exist(output_dir, 'dir')
         mkdir(output_dir);
     end
 
-    timestamp = datestr(now, 'yyyymmdd_HHMMSS');
-
     % 保存圖片
-    png_filename = sprintf('theoretical_bode_%s.png', timestamp);
+    png_filename = 'theoretical_bode.png';
     png_path = fullfile(output_dir, png_filename);
     saveas(fig, png_path);
     fprintf('  ✓ 圖片已保存: %s\n', png_filename);
@@ -348,7 +349,7 @@ if SAVE_RESULTS
         theoretical_results.experimental_phase = experimental_phase;
     end
 
-    mat_filename = sprintf('theoretical_bode_%s.mat', timestamp);
+    mat_filename = 'theoretical_bode.mat';
     mat_path = fullfile(output_dir, mat_filename);
     save(mat_path, 'theoretical_results', '-v7.3');
     fprintf('  ✓ 數據已保存: %s\n', mat_filename);

@@ -623,10 +623,10 @@ else
     fprintf('  -3dB 頻寬: > %.2f Hz (未達到)\n', frequencies(end));
 end
 
-% DC 增益（最低頻）
-dc_gain_dB = mag_dB(1);
-fprintf('  DC 增益 (%.1f Hz): %.2f dB (%.2f%%)\n', ...
-        frequencies(1), dc_gain_dB, 10^(dc_gain_dB/20)*100);
+% 低頻增益（最低測試頻率，近似 DC 增益）
+low_freq_gain_dB = mag_dB(1);
+fprintf('  低頻增益 (%.1f Hz): %.2f dB (%.2f%%) [近似 DC]\n', ...
+        frequencies(1), low_freq_gain_dB, 10^(low_freq_gain_dB/20)*100);
 
 % 高頻增益（最高頻）
 hf_gain_dB = mag_dB(end);

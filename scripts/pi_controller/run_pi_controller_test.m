@@ -75,7 +75,13 @@ legend_fontsize = 11;            % 圖例字體大小
 ENABLE_PLOT = true;
 SAVE_PNG = true;
 SAVE_MAT = true;
-output_dir = fullfile('test_results', controller_type);
+
+% 根據測試類型選擇輸出資料夾
+if strcmpi(signal_type_name, 'sine')
+    output_dir = fullfile('test_results', controller_type, 'sine_wave');
+else
+    output_dir = fullfile('test_results', controller_type, 'step_response');
+end
 
 %% SECTION 2: 初始化與驗證
 
