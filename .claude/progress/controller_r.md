@@ -86,3 +86,76 @@
 - 當前測試參數：d=2, Channel=1, Frequency=1000Hz
 
 ---
+
+## 2025-01-27 15:30 - R Controller 頻率響應測試框架與觀測器驗證
+
+### ✅ 完成部分
+- ✅ 建立批次頻率掃描測試框架 (`run_batch_frequency_sweep.m`)
+- ✅ 實作R控制器參數計算功能 (`r_controller_calc_params.m`)
+- ✅ 重構通用R控制器函數，優化程式碼結構 (-33行)
+- ⏸️ 觀測器性能驗證測試進行中 (`temp_verify_observer_performance.m`)
+- ✅ 整合PI控制器頻率掃描功能到R控制器測試流程
+- ✅ 新增觀測器數學推導文件
+
+### 📁 檔案變更分析
+
+**新增檔案：**
+- `r_controller_package/model/r_controller_calc_params.m` (209 行)
+  用途：計算R控制器參數並建立參數匯流排
+- `r_controller_package/test_script/run_batch_frequency_sweep.m` (901 行) ⚠️ 大型檔案
+  用途：批次執行多種測試條件的頻率響應掃描
+- `r_controller_package/test_script/OBSERVER_MATHEMATICAL_DERIVATION.md`
+  用途：觀測器設計的數學理論文件
+- `r_controller_package/test_script/temp_verify_observer_performance.m` (364 行) ⚠️ 臨時檔案
+  用途：驗證觀測器追蹤性能與誤差分析
+- `Control_System_Framework.slx`
+  用途：系統框架模型（可能為測試或參考用途）
+
+**修改檔案：**
+- `r_controller_package/model/r_controller_function_general.m` (-33 行)
+  主要變更：重構程式碼，簡化邏輯，提升可讀性
+- `r_controller_package/model/r_controller_system_integrated.slx`
+  主要變更：更新系統整合模型配置
+- `r_controller_package/test_script/run_frequency_sweep.m`
+  主要變更：調整頻率掃描參數或測試流程
+- `r_controller_package/test_script/run_rcontroller_test.m`
+  主要變更：更新測試腳本以配合新功能
+- `scripts/pi_controller/run_frequency_sweep.m` (+1 行)
+  主要變更：微調PI控制器測試參數
+- `controllers/pi_controller/PI_Controller_Integrated.slx`
+  主要變更：PI控制器模型更新
+
+**刪除檔案：**
+- 移除了舊版控制器函數 (`r_controller_function_p1_d2.m`, `r_controller_function_p2_d2.m`)
+- 清理備份檔案 (`r_controller_function_p1_d2.m.backup`)
+- 移除舊的頻率響應繪圖腳本 (`plot_freq_response.m`)
+
+### 🧪 測試狀態
+⏸️ **測試進行中**
+- 已測試：批次頻率掃描框架建立完成 ✅
+- 測試中：觀測器性能驗證 ⏸️
+- 待測試：完整系統整合測試 ⬜
+
+### 📋 下一步建議
+- [ ] 完成觀測器性能驗證並整理結果
+- [ ] 決定 `temp_verify_observer_performance.m` 的處理方式（整合或刪除）
+- [ ] 考慮重構 `run_batch_frequency_sweep.m` (901行) - 檔案過大
+- [ ] 執行完整的R控制器系統測試
+- [ ] 清理或正式化 `Control_System_Framework.slx` 的用途
+- [ ] 驗證參數計算功能的正確性
+
+### 📝 問題與筆記
+⚠️ **需要注意：**
+- 發現臨時測試檔案：`temp_verify_observer_performance.m`
+- 大型檔案警告：`run_batch_frequency_sweep.m` (901行) - 建議考慮模組化
+- 移除了多個舊版控制器函數，確保系統仍正常運作
+
+💡 **開發筆記：**
+- 成功將PI控制器的頻率掃描功能移植到R控制器
+- 通用控制器函數經過優化，減少33行程式碼
+- 觀測器設計有完整數學推導文件支援
+
+### 📌 Git Commit
+`bc0d548` - WIP(r): Implement frequency response test framework with observer validation
+
+---
