@@ -662,3 +662,4 @@ run_type3_test
 **Maintained by:** Project Owner
 **Version:** 3.0
 - 記得在到我的需求後或是在開一個新的對話後，要先完整的檢視一次專案的進度情況以及了解simulink 中模型的情況
+- 我現在如果在controller/r中工作，且我如果要開發r_controller我都會優先在r_controller_package中開發
