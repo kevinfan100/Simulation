@@ -88,3 +88,36 @@
 - 輸出結構層次清晰（batch → channel → Kp）
 
 ---
+
+## 2025-01-27 - Fix Kp Color Array Index Error
+
+### Completed Parts
+- ✅ 修復批次頻率掃描腳本的顏色陣列索引錯誤
+- ✅ 新增第 4 個 Kp 值的視覺化顏色支援（綠色）
+
+### File Changes
+**Modified Files:**
+- `scripts/pi_controller/run_batch_frequency_sweep.m` (+1 line)
+  - **主要變更：** 在 `kp_colors` 陣列中新增第 4 種顏色（綠色：RGB 0.4660, 0.6740, 0.1880）
+  - **修復問題：** 解決 Kp_values=[1,2,4,8] 有 4 個值，但 kp_colors 只有 3 種顏色導致的陣列索引超出範圍錯誤
+  - **影響範圍：** 通道 Kp 對比圖生成（Magnitude 和 Phase 子圖）
+
+### Testing Status
+✅ **已測試並確認**
+- 使用者已在 MATLAB 中執行測試
+- 腳本成功運行，未再出現 "Index exceeds array bounds" 錯誤
+- 4 個 Kp 值的視覺化正常顯示
+
+### Next Steps
+- ⬜ （無待辦事項）- 此次修復為獨立 bug fix，已完成並測試
+
+### Issues & Notes
+
+💡 **技術筆記：**
+- 顏色配置現在支援 4 個 Kp 值：藍色(1) → 橘色(2) → 黃色(4) → 綠色(8)
+- 使用 MATLAB 預設配色方案，確保視覺區分性
+
+### Git Commit
+`1702631` - fix(pi): Add missing color for 4th Kp value in batch sweep
+
+---

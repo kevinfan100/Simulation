@@ -125,11 +125,16 @@ Ask:
 ```
 
 **If option 1 (Commit WIP):**
-1. Save record to `.claude/progress/{branch_name}.md` (replace slashes with underscores)
-2. Stage all changes: `git add .`
-3. Commit with the generated message
-4. Push to origin
-5. Show success summary
+1. Stage all code changes: `git add .` (excludes progress record which doesn't exist yet)
+2. Commit with the generated message
+3. Get commit hash: `git log -1 --format="%h"`
+4. Save record to `.claude/progress/{branch_name}.md` with actual commit hash (replace slashes with underscores)
+5. Stage progress record: `git add .claude/progress/{branch_name}.md`
+6. Create documentation commit: `git commit -m "docs({scope}): Update progress log with {feature}"`
+   - {scope} should be the controller type (pi/r/type3) or "project" for general changes
+   - {feature} should be a brief description of what was completed
+7. Push to origin (pushes both commits)
+8. Show success summary
 
 **If option 2 (Record only):**
 1. Save record to `.claude/progress/{branch_name}.md`
