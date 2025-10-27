@@ -12,7 +12,13 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(matlab:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(del:*)",
+      "Bash(awk:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

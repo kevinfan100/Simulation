@@ -33,7 +33,7 @@ frequencies = [1, 5, 10, 20, 50, 100, ...        % 低頻段 (1-100 Hz): 6點
 
 % Vd Generator 設定
 signal_type_name = 'sine';
-Channel = 5;              % 激發通道 (1-6)，可自由設定
+Channel = 1;              % 激發通道 (1-6)，可自由設定
 Amplitude = 0.5;          % 振幅 [V]
 Phase = 0;                % 相位 [deg]
 SignalType = 1;           % Sine mode

@@ -9,14 +9,14 @@ addpath(fullfile(package_root_temp, 'model'));
 
 %% SECTION 1: 配置區域
 
-test_name = 'test_without_w1hat';    % 測試名稱（用於檔案命名）
+test_name = 'test';    % 測試名稱（用於檔案命名）
 
 %Vd Generator
 signal_type_name = 'sine';      % 'step' 或 'sine'
 
 % preview
-d = 2;
-Channel = 1;                    % 激發通道 (1-6)
+d = 0;
+Channel = 2;                    % 激發通道 (1-6)
 Amplitude = 1;               % 振幅 [V]
 Frequency = 1000;                % Sine 頻率 [Hz]
 Phase = 0;                      % Sine 相位 [deg]
@@ -34,14 +34,19 @@ sine_max_sim_time = 50.0;       % 最大模擬時間 [s]
 
 % lambda corresponding bandwidth [Hz]
 T = 1e-5;
-fB_c = 3200;
+fB_c = 4000;
 fB_e = 16000;
 
 lambda_c = exp(-fB_c*T*2*pi);
 lambda_e = exp(-fB_e*T*2*pi);
 beta = sqrt(lambda_e * lambda_c);
 
-% Noise
+% ==================== 計算控制器參數 ====================
+% 使用 r_controller_calc_params 計算所有控制器係數
+% 此函數會自動創建 Bus Object 並包裝為 Simulink.Parameter
+params = r_controller_calc_params(fB_c, fB_e);
+% ======================================================
+
 
 
 Ts = 1e-5;                      % 採樣時間 [s] (100 kHz)
