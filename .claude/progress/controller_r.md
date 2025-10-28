@@ -1,5 +1,66 @@
 # R Controller Development Progress
 
+## 2025-01-28 21:00 - P2D0 Controller Implementation & Parameter Structure Unification
+
+### Completed Parts
+- ✅ 實作 R Controller Page 2 d=0（無預覽）版本
+- ✅ 建立 P2D0 參數計算函數，包含 l_1, l_2, l_3, l_4 估測器增益
+- ✅ 統一 General 和 P2D0 參數結構（26個欄位）
+- ✅ 修復 Simulink ParamsBus 與參數結構不匹配問題
+- ✅ 確保參數欄位順序完全一致，解決 Bus 元素順序錯誤
+- ✅ 整合控制器切換功能到 run_rcontroller_test.m
+- ✅ 清理診斷和臨時檔案，保持專案結構整潔
+
+### File Changes
+**New Files:**
+- `r_controller_package/model/r_controller_function_p2_d0.m` (116 lines)
+  Purpose: P2D0 控制器實作，與 General 版本相同介面，可手動切換
+
+- `r_controller_package/model/r_controller_calc_params_p2.m` (229 lines)
+  Purpose: P2D0 參數計算，包含正確的欄位順序和 Bus 定義
+
+**Modified Files:**
+- `r_controller_package/model/r_controller_calc_params.m` (+27 lines)
+  Main changes: 新增 P2D0 相容性欄位（l_1, l_2, l_3, l_4）到 ParamsBus 定義
+
+- `r_controller_package/test_script/run_rcontroller_test.m` (+49 lines)
+  Main changes: 新增控制器版本選擇（CONTROLLER_TYPE），整合 P2D0 參數計算
+
+- `r_controller_package/model/r_controller_system_integrated.slx`
+  Main changes: Simulink 模型配置更新
+
+**Deleted Files:**
+- `r_controller_package/test_script/temp_verify_observer_performance.m`
+  Reason: 臨時測試檔案，功能已驗證完成
+
+### Testing Status
+✅ **Testing Completed**
+- Tested: General Controller 正常運作 ✅
+- Tested: P2D0 Controller 正常運作 ✅
+- Tested: 參數結構一致性驗證 ✅
+- Tested: Simulink 模擬執行成功 ✅
+
+### Next Steps
+- [ ] 在 Simulink 模型中實作控制器自動切換邏輯
+- [ ] 執行 P2D0 與 General 控制器的性能比較測試
+- [ ] 記錄兩種估測器結構的差異與優缺點
+- [ ] 考慮實作 d > 0 的預覽版本
+
+### Issues & Notes
+💡 **Important Notes:**
+- P2D0 使用 Page 2 估測器結構（l_1 到 l_4），General 使用原始結構（L1 到 L3）
+- 兩個版本共用相同的參數結構（26個欄位），使用 dummy 值填充不需要的欄位
+- Simulink 要求參數欄位順序必須與 Bus 元素順序完全一致
+
+⚠️ **Resolved Issues:**
+- ✅ ParamsBus 元素數量不匹配（從 24 增加到 26）
+- ✅ 參數欄位順序不一致（重新排序並統一）
+
+### Git Commit
+`18cc300` - feat(r): Implement P2D0 controller with unified parameter structure
+
+---
+
 ## 2025-01-27 09:30 - R Controller 測試腳本完整移植 PI Controller 功能
 
 ### ✅ 完成部分
