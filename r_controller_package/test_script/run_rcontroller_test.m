@@ -9,13 +9,17 @@ addpath(fullfile(package_root_temp, 'model'));
 
 %% SECTION 1: 配置區域
 
+% ========== 控制器版本選擇 ==========
+CONTROLLER_TYPE = 'p2_d0';  % 選項: 'general' 或 'p2_d0'
+% 注意：請確保在 Simulink 模型中對應切換 MATLAB Function
+
 test_name = 'test';    % 測試名稱（用於檔案命名）
 
 %Vd Generator
 signal_type_name = 'sine';      % 'step' 或 'sine'
 
 % preview
-d = 0;
+d = 0;  % 統一使用 d=0 (無 preview)
 Channel = 2;                    % 激發通道 (1-6)
 Amplitude = 1;               % 振幅 [V]
 Frequency = 1000;                % Sine 頻率 [Hz]
@@ -42,9 +46,21 @@ lambda_e = exp(-fB_e*T*2*pi);
 beta = sqrt(lambda_e * lambda_c);
 
 % ==================== 計算控制器參數 ====================
-% 使用 r_controller_calc_params 計算所有控制器係數
-% 此函數會自動創建 Bus Object 並包裝為 Simulink.Parameter
-params = r_controller_calc_params(fB_c, fB_e);
+% 根據控制器版本選擇對應的參數計算函數
+switch CONTROLLER_TYPE
+    case 'general'
+        % 使用通用版本的參數計算 (L1, L2, L3, beta)
+        params = r_controller_calc_params(fB_c, fB_e);
+        fprintf('使用 General Controller (L1, L2, L3 增益)\n');
+
+    case 'p2_d0'
+        % 使用 Page 2 版本的參數計算 (l_1, l_2, l_3, l_4)
+        params = r_controller_calc_params_p2(fB_c, fB_e);
+        fprintf('使用 Page 2 d=0 Controller (l_1, l_2, l_3, l_4 增益)\n');
+
+    otherwise
+        error('未知的控制器版本: %s', CONTROLLER_TYPE);
+end
 % ======================================================
 
 
@@ -98,6 +114,7 @@ end
 fprintf('\n');
 fprintf('════════════════════════════════════════════════════════════\n');
 fprintf('           R Controller 自動化測試\n');
+fprintf('           控制器版本: %s\n', CONTROLLER_TYPE);
 fprintf('════════════════════════════════════════════════════════════\n');
 fprintf('\n');
 
@@ -202,6 +219,11 @@ fprintf('    - StopTime: %.4f s\n', sim_time);
 fprintf('    - Solver: %s\n', solver);
 fprintf('    - MaxStep: %.2e s\n', Ts/10);
 
+% 將 params 變數設定到模型工作區或基礎工作區
+% 確保 Simulink 模型可以存取 params 變數
+assignin('base', 'params', params);
+fprintf('  ✓ 參數已載入至工作區\n');
+
 fprintf('\n');
 
 %% SECTION 5: 執行模擬
@@ -217,7 +239,24 @@ try
     elapsed_time = toc;
     fprintf('  ✓ 模擬完成 (耗時 %.2f 秒)\n', elapsed_time);
 catch ME
-    error('模擬失敗: %s', ME.message);
+    fprintf('  ❌ 模擬失敗\n');
+    fprintf('  錯誤訊息: %s\n', ME.message);
+
+    % 顯示更詳細的錯誤資訊
+    if ~isempty(ME.cause)
+        fprintf('\n  詳細原因:\n');
+        for i = 1:length(ME.cause)
+            fprintf('  [%d] %s\n', i, ME.cause{i}.message);
+        end
+    end
+
+    % 顯示錯誤堆疊
+    fprintf('\n  錯誤堆疊:\n');
+    for i = 1:min(3, length(ME.stack))
+        fprintf('  - %s (line %d)\n', ME.stack(i).name, ME.stack(i).line);
+    end
+
+    rethrow(ME);
 end
 
 fprintf('\n');

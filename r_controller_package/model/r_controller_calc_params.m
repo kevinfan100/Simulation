@@ -193,11 +193,38 @@ function params = r_controller_calc_params(fB_c, fB_e)
     elems(22).Name = 'neg_beta';
     elems(22).DataType = 'double';
 
+    % P2D0 compatibility fields (dummy fields for P2D0 version)
+    elems(23) = Simulink.BusElement;
+    elems(23).Name = 'l_1';
+    elems(23).DataType = 'double';
+
+    elems(24) = Simulink.BusElement;
+    elems(24).Name = 'l_2';
+    elems(24).DataType = 'double';
+
+    elems(25) = Simulink.BusElement;
+    elems(25).Name = 'l_3';
+    elems(25).DataType = 'double';
+
+    elems(26) = Simulink.BusElement;
+    elems(26).Name = 'l_4';
+    elems(26).DataType = 'double';
+
     % Assign elements to bus
     ParamsBus.Elements = elems;
 
     % Save ParamsBus to base workspace
     assignin('base', 'ParamsBus', ParamsBus);
+
+    % ========================================
+    % ADD P2D0 DUMMY FIELDS (for Simulink compatibility)
+    % ========================================
+    % ⚠️ 以下欄位是為了與 P2D0 版本相容而加入的 DUMMY 值
+    % P2D0 使用小寫 l_1~l_4，General 使用大寫 L1~L3
+    params.l_1 = 0;  % DUMMY - P2D0 相容性欄位（不使用）
+    params.l_2 = 0;  % DUMMY - P2D0 相容性欄位（不使用）
+    params.l_3 = 0;  % DUMMY - P2D0 相容性欄位（不使用）
+    params.l_4 = 0;  % DUMMY - P2D0 相容性欄位（不使用）
 
     % ========================================
     % WRAP AS SIMULINK.PARAMETER WITH BUS TYPE
