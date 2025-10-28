@@ -12,11 +12,11 @@ addpath(fullfile(project_root_temp, 'controllers', 'pi_controller'));
 
 %% SECTION 1: 配置區域
 
-test_name = 'step_2_2206_p3';    % 測試名稱（用於檔案命名）
+test_name = 'sine_1_2206_p3';    % 測試名稱（用於檔案命名）
 
 % Vd Generator
-signal_type_name = 'step';      % 'step' 或 'sine'
-Channel = 3;                    % 激發通道 (1-6)
+signal_type_name = 'sine';      % 'step' 或 'sine'
+Channel = 2;                    % 激發通道 (1-6)
 Amplitude = 1;                  % 振幅 [V]
 Frequency = 10;                % Sine 頻率 [Hz]
 Phase = 0;                      % Sine 相位 [deg]
@@ -34,7 +34,7 @@ sine_max_sim_time = 50.0;       % 最大模擬時間 [s]
 
 % PI 控制器參數
 zc = 2206;
-Kp_value = 2;                 % 比例增益
+Kp_value = 1;                 % 比例增益
 Ki_value = Kp_value * zc;       % 積分增益
 
 Ts = 1e-5;                      % 採樣時間 [s] (100 kHz)

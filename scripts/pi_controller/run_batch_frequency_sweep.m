@@ -34,7 +34,7 @@ addpath(fullfile(scripts_root, 'common'));
 addpath(fullfile(project_root, 'controllers', 'pi_controller'));
 
 % === 核心參數 ===
-Kp_values = [1, 2, 4, 8];          % 要測試的 Kp 值
+Kp_values = [1, 2];          % 要測試的 Kp 值
 test_channels = 1:6;            % 要測試的通道
 zc = 2206;                      % 固定 zc (Ki = Kp * zc)
 
