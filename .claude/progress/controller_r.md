@@ -1,5 +1,74 @@
 # R Controller Development Progress
 
+## 2025-01-30 15:00 - 控制效能分析與頻率響應理論驗證
+
+### Completed Parts
+- ✅ 新增控制效能（Control Effort）完整分析測試腳本
+- ✅ 改進測試腳本顯示模式（簡化/完整模式切換）
+- ✅ 優化圖形視窗管理和自動位置配置
+- ✅ 頻率掃描增加理論曲線對比功能
+- ✅ 新增理論誤差分析（最大/平均/RMS 誤差）
+- ✅ 修正控制器參數配置（fB_c, fB_e）
+
+### File Changes
+**New Files:**
+- `r_controller_package/test_script/test_control_effort_analysis.m` (441 lines)
+  Purpose: 完整自動化測試，驗證 Control Effort 與頻率響應的關係，自動執行兩個配置並分析結果
+
+**Modified Files:**
+- `r_controller_package/test_script/run_rcontroller_test.m` (+97 lines, 淨增約 +71 lines)
+  Main changes:
+  - 新增 DISPLAY_MODE 控制（'full' / 'simplified'）
+  - 新增圖形視窗自動位置配置（FIGURE_POSITIONS）
+  - 控制器切換回 'general' 模式
+  - 調整控制器參數：fB_c = 4000 → 500 Hz, fB_e = 16000 → 2500 Hz
+  - 優化圖形顯示邏輯（簡化模式下隱藏部分圖表）
+
+- `r_controller_package/test_script/run_frequency_sweep.m` (+65 lines)
+  Main changes:
+  - 新增理論曲線計算與繪製（基於 b 參數）
+  - 新增模擬與理論的誤差分析（百分比誤差）
+  - 將理論值和誤差保存到結果結構中
+  - 新增理論對比統計輸出（最大/平均/RMS 誤差）
+
+- `scripts/pi_controller/run_pi_controller_test.m` (+6 lines)
+  Main changes: 微調 PI 控制器測試參數
+
+- `controllers/pi_controller/PI_Controller_Integrated.slx` (Simulink 模型)
+  Main changes: 模型配置更新
+
+- `.claude/settings.local.json` (+4 lines, 配置更新)
+
+### Testing Status
+⏸️ **Testing In Progress**
+- Pending: `test_control_effort_analysis.m` 完整執行驗證 ⬜
+- Pending: 簡化顯示模式功能驗證 ⬜
+- Pending: 理論曲線對比準確性驗證 ⬜
+- Pending: 雙視窗自動位置配置 ⬜
+
+### Next Steps
+- [ ] 執行 `test_control_effort_analysis.m` 驗證自動化測試流程
+- [ ] 測試簡化顯示模式，確認只顯示關鍵圖表
+- [ ] 驗證理論誤差分析結果的合理性
+- [ ] 對比不同參數組合（fB_c = 500 vs 4000）的性能差異
+- [ ] 整理測試結果並記錄觀察結果
+
+### Issues & Notes
+⚠️ **Attention:**
+- 新增檔案 `test_control_effort_analysis.m` (441 lines) - 建議測試完成後確認是否保留或整合
+- 控制器參數大幅調整（fB_c 降低 8 倍，fB_e 降低 6.4 倍），可能影響系統響應特性
+- 理論曲線計算基於 b 參數，需確認物理意義和適用範圍
+
+💡 **Highlights:**
+- 自動化測試腳本設計完善，可一鍵執行多組配置
+- 理論與模擬對比功能有助於驗證模型準確性
+- 簡化顯示模式提升使用體驗，適合快速測試
+
+### Git Commit
+`c542a35` - WIP(r): Add control effort analysis and theoretical comparison
+
+---
+
 ## 2025-01-28 21:00 - P2D0 Controller Implementation & Parameter Structure Unification
 
 ### Completed Parts
