@@ -79,7 +79,7 @@ output_dir = fullfile(package_root, 'test_results', 'frequency_response', test_f
 model_name = 'r_controller_system_integrated';
 model_path = fullfile(package_root, 'model', [model_name '.slx']);
 
-%% SECTION 2: 初始化 
+%% SECTION 2: 初始化
 
 fprintf('【測試配置】\n');
 fprintf('────────────────────────\n');
@@ -96,6 +96,11 @@ fprintf('  控制器頻寬: %.1f kHz\n', fB_c/1000);
 fprintf('  估測器頻寬: %.1f kHz\n', fB_e/1000);
 fprintf('  總週期數: %d (跳過 %d, 分析 %d)\n', total_cycles, skip_cycles, fft_cycles);
 fprintf('  Solver: %s (固定步長)\n', solver);
+fprintf('\n');
+
+% 取得 b 參數值用於理論曲線計算
+b_value = params.Value.b;
+fprintf('  理論模型參數 b: %.4f\n', b_value);
 fprintf('\n');
 
 % 檢查模型
@@ -439,6 +444,13 @@ for d_idx = 1:num_d
         fprintf('\n');
     end
 
+    % 計算理論值（在儲存前計算，以便保存到結果中）
+    H_theory_save = zeros(size(frequencies));
+    for i = 1:length(frequencies)
+        theta = 2*pi*frequencies(i)*Ts;  % θ = ω·Ts
+        H_theory_save(i) = (1 + 2*b_value*cos(theta) + b_value^2) / (1 + b_value)^2;
+    end
+
     % 儲存此 d 值的結果
     results(d_idx).d_value = d;
     results(d_idx).frequencies = frequencies;
@@ -449,6 +461,15 @@ for d_idx = 1:num_d
     results(d_idx).Channel = Channel;
     results(d_idx).fB_c = fB_c;
     results(d_idx).fB_e = fB_e;
+
+    % 理論值和誤差分析
+    results(d_idx).theory.b_value = b_value;
+    results(d_idx).theory.H_magnitude = H_theory_save;
+    results(d_idx).theory.H_magnitude_dB = 20 * log10(H_theory_save);
+    results(d_idx).theory.error_percent = abs(magnitude_ratio_all(:, Channel) - H_theory_save') ./ H_theory_save' * 100;
+    results(d_idx).theory.max_error_percent = max(results(d_idx).theory.error_percent);
+    results(d_idx).theory.mean_error_percent = mean(results(d_idx).theory.error_percent);
+    results(d_idx).theory.rms_error_percent = sqrt(mean(results(d_idx).theory.error_percent.^2));
 
     % 品質檢測結果
     results(d_idx).quality.steady_state = quality_steady_state;
@@ -512,6 +533,36 @@ for d_idx = 1:num_d
                      'DisplayName', sprintf('P%d', ch));
         end
     end
+
+    % === 加入理論曲線（使用灰色系）===
+    % 計算理論增益響應
+    H_theory = zeros(size(frequencies));
+    for i = 1:length(frequencies)
+        theta = 2*pi*frequencies(i)*Ts;  % θ = ω·Ts
+        H_theory(i) = (1 + 2*b_value*cos(theta) + b_value^2) / (1 + b_value)^2;
+    end
+
+    % 繪製理論曲線（深灰色粗虛線）
+    semilogx(frequencies, H_theory, '--', ...
+             'LineWidth', 3, ...
+             'Color', [0.3, 0.3, 0.3], ...  % 深灰色
+             'DisplayName', sprintf('Theory (b=%.4f)', b_value));
+
+    % 在理論曲線上加標記點（每隔一個點）
+    indices_theory = 1:2:length(frequencies);  % 每隔一個點
+    plot(frequencies(indices_theory), H_theory(indices_theory), 'd', ...
+         'MarkerSize', 8, ...
+         'MarkerFaceColor', [0.9, 0.9, 0.9], ...  % 淺灰填充
+         'MarkerEdgeColor', [0.2, 0.2, 0.2], ...  % 深灰邊框
+         'LineWidth', 1.5, ...
+         'HandleVisibility', 'off');  % 不顯示在圖例中
+
+    % === 計算模擬與理論的誤差 ===
+    mag_excited = magnitude_ratio(:, Channel);
+    error_percent = abs(mag_excited - H_theory') ./ H_theory' * 100;
+    [max_error, max_idx] = max(error_percent);
+
+    % 不再標註最大誤差點
 
     % === 計算並標註 -3dB 頻寬點（內插計算）===
     mag_dB_excited = results(d_idx).magnitude_dB(:, Channel);
@@ -724,6 +775,18 @@ for d_idx = 1:num_d
     phase_ch = results(d_idx).phase_lag(:, Channel);
     fprintf('\n  相位範圍: %.2f° ~ %.2f°\n', min(phase_ch), max(phase_ch));
     fprintf('  平均相位: %.2f°\n', mean(phase_ch));
+
+    % 理論對比統計
+    fprintf('\n【理論對比分析 (b = %.4f)】\n', results(d_idx).theory.b_value);
+    fprintf('  最大誤差: %.2f%% @ %.1f Hz\n', ...
+            results(d_idx).theory.max_error_percent, ...
+            frequencies(find(results(d_idx).theory.error_percent == results(d_idx).theory.max_error_percent, 1)));
+    fprintf('  平均誤差: %.2f%%\n', results(d_idx).theory.mean_error_percent);
+    fprintf('  RMS 誤差: %.2f%%\n', results(d_idx).theory.rms_error_percent);
+
+    % 找出誤差最小的頻率
+    [min_error, min_idx] = min(results(d_idx).theory.error_percent);
+    fprintf('  最小誤差: %.2f%% @ %.1f Hz\n', min_error, frequencies(min_idx));
 
     fprintf('\n');
 end

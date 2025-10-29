@@ -18,7 +18,9 @@
       "Bash(findstr:*)",
       "Bash(del:*)",
       "Bash(awk:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(for branch in master develop controller/pi controller/r)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

@@ -10,7 +10,7 @@ addpath(fullfile(package_root_temp, 'model'));
 %% SECTION 1: 配置區域
 
 % ========== 控制器版本選擇 ==========
-CONTROLLER_TYPE = 'p2_d0';  % 選項: 'general' 或 'p2_d0'
+CONTROLLER_TYPE = 'general';  % 選項: 'general' 或 'p2_d0'
 % 注意：請確保在 Simulink 模型中對應切換 MATLAB Function
 
 test_name = 'test';    % 測試名稱（用於檔案命名）
@@ -38,8 +38,8 @@ sine_max_sim_time = 50.0;       % 最大模擬時間 [s]
 
 % lambda corresponding bandwidth [Hz]
 T = 1e-5;
-fB_c = 4000;
-fB_e = 16000;
+fB_c = 500;   % 第二個測試設定
+fB_e = 2500;
 
 lambda_c = exp(-fB_c*T*2*pi);
 lambda_e = exp(-fB_e*T*2*pi);
@@ -64,6 +64,20 @@ end
 % ======================================================
 
 
+
+% ========== 顯示控制設定 ==========
+DISPLAY_MODE = 'simplified';  % 'full' = 顯示所有圖, 'simplified' = 只顯示兩張圖
+SAVE_ALL_FIGURES = true;      % 是否儲存所有圖形（即使不顯示）
+
+% ========== 視窗位置設定 ==========
+% [left, bottom, width, height] 單位是 pixels
+% 可根據您的螢幕調整這些值
+FIGURE_POSITIONS = struct();
+FIGURE_POSITIONS.VdVm = [50, 100, 900, 700];           % Vd vs Vm 圖的位置（左側）
+FIGURE_POSITIONS.ControlEffort = [980, 100, 900, 700]; % Control Effort 圖的位置（右側）
+
+% 如果想要在第二個螢幕顯示（如果有的話），可以用負值的 left
+% 例如：[-1800, 100, 900, 700] 會在左邊的第二個螢幕
 
 Ts = 1e-5;                      % 採樣時間 [s] (100 kHz)
 solver = 'ode45';             % Simulink solver  ode23tb
@@ -480,8 +494,12 @@ if ENABLE_PLOT
     fprintf('────────────────────────\n');
 
     if strcmpi(signal_type_name, 'sine')
-        % === 圖 1: Vm_Vd ===
-        fig1 = figure('Name', 'Vm_Vd', 'Position', [100, 100, 800, 600]);
+        % === 圖 1: Vm_Vd（永遠顯示） ===
+        if strcmpi(DISPLAY_MODE, 'simplified')
+            fig1 = figure('Name', 'Vm_Vd', 'Position', FIGURE_POSITIONS.VdVm);
+        else
+            fig1 = figure('Name', 'Vm_Vd', 'Position', [100, 100, 800, 600]);
+        end
 
         hold on;
         grid on;
@@ -537,9 +555,15 @@ if ENABLE_PLOT
 
         fprintf('  ✓ Figure 1: Vm_Vd (with FFT analysis)\n');
 
-        % === 圖 2: 6 通道時域響應 ===
-        fig2 = figure('Name', '6 Channels Time Response', ...
-                      'Position', [150, 150, 1200, 800]);
+        % === 圖 2: 6 通道時域響應（根據模式決定是否顯示） ===
+        if strcmpi(DISPLAY_MODE, 'full')
+            fig2 = figure('Name', '6 Channels Time Response', ...
+                          'Position', [150, 150, 1200, 800]);
+        else
+            % 簡化模式下不顯示此圖
+            fig2 = figure('Name', '6 Channels Time Response', ...
+                          'Position', [150, 150, 1200, 800], 'Visible', 'off');
+        end
 
         for ch = 1:6
             subplot(2, 3, ch);
@@ -573,9 +597,14 @@ if ENABLE_PLOT
 
         fprintf('  ✓ Figure 2: 6 Channels Time Response\n');
 
-        % === 圖 3: 完整時域響應 ===
-        fig3 = figure('Name', 'Full Time Response', ...
-                      'Position', [200, 200, 1000, 600]);
+        % === 圖 3: 完整時域響應（根據模式決定是否顯示） ===
+        if strcmpi(DISPLAY_MODE, 'full')
+            fig3 = figure('Name', 'Full Time Response', ...
+                          'Position', [200, 200, 1000, 600]);
+        else
+            fig3 = figure('Name', 'Full Time Response', ...
+                          'Position', [200, 200, 1000, 600], 'Visible', 'off');
+        end
 
         for ch = 1:6
             plot(t, Vm_data(:, ch), 'Color', colors(ch, :), ...
@@ -622,9 +651,14 @@ if ENABLE_PLOT
         fprintf('  📊 詳細分析窗口: %.4f - %.4f s (%.1f 個週期, %d 點)\n', ...
                 t_start_detail, t_end_detail, actual_cycles, sum(idx_detail));
 
-        % === 圖 4: W1_hat 估測值 (最後 10 個週期) ===
-        fig4 = figure('Name', sprintf('W1_hat Estimation (Last %d cycles)', detail_cycles), ...
-                      'Position', [250, 250, 1200, 800]);
+        % === 圖 4: W1_hat 估測值（根據模式決定是否顯示） ===
+        if strcmpi(DISPLAY_MODE, 'full')
+            fig4 = figure('Name', sprintf('W1_hat Estimation (Last %d cycles)', detail_cycles), ...
+                          'Position', [250, 250, 1200, 800]);
+        else
+            fig4 = figure('Name', sprintf('W1_hat Estimation (Last %d cycles)', detail_cycles), ...
+                          'Position', [250, 250, 1200, 800], 'Visible', 'off');
+        end
 
         for ch = 1:6
             subplot(2, 3, ch);
@@ -646,9 +680,16 @@ if ENABLE_PLOT
 
         fprintf('  ✓ Figure 4: W1_hat Estimation (Last %d cycles)\n', detail_cycles);
 
-        % === 圖 5: 控制輸入 u (最後 10 個週期) ===
-        fig5 = figure('Name', sprintf('Control Input u (Last %d cycles)', detail_cycles), ...
-                      'Position', [300, 300, 1200, 800]);
+        % === 圖 5: 控制輸入 u (Control Effort - 第二個主要顯示圖) ===
+        if strcmpi(DISPLAY_MODE, 'simplified')
+            % 簡化模式下，這是第二個主要顯示的圖
+            fig5 = figure('Name', sprintf('Control Effort (Last %d cycles)', detail_cycles), ...
+                          'Position', FIGURE_POSITIONS.ControlEffort);
+        else
+            % 完整模式下使用原始位置
+            fig5 = figure('Name', sprintf('Control Input u (Last %d cycles)', detail_cycles), ...
+                          'Position', [300, 300, 1200, 800]);
+        end
 
         for ch = 1:6
             subplot(2, 3, ch);
@@ -659,7 +700,11 @@ if ENABLE_PLOT
             grid on;
             xlabel('Time (ms)', 'FontSize', xlabel_fontsize-2, 'FontWeight', 'bold');
             ylabel('Control Input u (V)', 'FontSize', ylabel_fontsize-2, 'FontWeight', 'bold');
-            title(sprintf('P%d', ch), 'FontSize', title_fontsize-2, 'FontWeight', 'bold');
+
+            % 計算 RMS 值
+            u_rms = rms(u_detail(:, ch));
+            title(sprintf('P%d (RMS: %.3f V)', ch, u_rms), ...
+                  'FontSize', title_fontsize-2, 'FontWeight', 'bold');
 
             % 設定座標軸格式
             ax = gca;
@@ -668,11 +713,21 @@ if ENABLE_PLOT
             ax.FontWeight = 'bold';
         end
 
+        % 加入總標題顯示控制參數
+        sgtitle(sprintf('Control Effort - fB_c=%.0f Hz, fB_e=%.0f Hz (Last %d cycles)', ...
+                        fB_c, fB_e, detail_cycles), ...
+                'FontSize', title_fontsize, 'FontWeight', 'bold');
+
         fprintf('  ✓ Figure 5: Control Input u (Last %d cycles)\n', detail_cycles);
 
-        % === 圖 6: 追蹤誤差 e (最後 10 個週期) ===
-        fig6 = figure('Name', sprintf('Tracking Error e (Last %d cycles)', detail_cycles), ...
-                      'Position', [350, 350, 1200, 800]);
+        % === 圖 6: 追蹤誤差 e（根據模式決定是否顯示） ===
+        if strcmpi(DISPLAY_MODE, 'full')
+            fig6 = figure('Name', sprintf('Tracking Error e (Last %d cycles)', detail_cycles), ...
+                          'Position', [350, 350, 1200, 800]);
+        else
+            fig6 = figure('Name', sprintf('Tracking Error e (Last %d cycles)', detail_cycles), ...
+                          'Position', [350, 350, 1200, 800], 'Visible', 'off');
+        end
 
         for ch = 1:6
             subplot(2, 3, ch);
