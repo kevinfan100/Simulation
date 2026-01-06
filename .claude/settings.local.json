@@ -20,7 +20,15 @@
       "Bash(awk:*)",
       "Bash(xargs:*)",
       "Bash(for branch in master develop controller/pi controller/r)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "SlashCommand(/resume)",
+      "Bash(git stash:*)",
+      "Bash(git fetch:*)",
+      "Bash(git rev-list:*)",
+      "Bash(if [ ! -d \"r_controller_package/reference\" ])",
+      "Bash(then mkdir -p r_controller_package/reference)",
+      "Bash(else echo \"目錄已存在\")",
+      "Bash(fi)"
     ],
     "deny": [],
     "ask": []

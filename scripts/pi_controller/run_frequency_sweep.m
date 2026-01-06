@@ -27,13 +27,13 @@ addpath(fullfile(project_root, 'controllers', 'pi_controller'));
 
 % 頻率向量（使用 100,000 Hz 的因數，確保零 round() 誤差）
 % 所有頻率都能產生整數的 samples_per_cycle，避免相位漂移問題
-frequencies = [1, 5, 10, 20, 50, 100, ...        % 低頻段 (1-100 Hz): 6點
+frequencies = [1, 10, 20, 50, 100, ...        % 低頻段 (1-100 Hz): 6點
                125, 200, 250, 400, 500, ...      % 中頻段 (100-500 Hz): 5點
                625, 800, 1000, 1250, 2000];      % 高頻段 (500-2000 Hz): 5點
 
 % Vd Generator 設定
 signal_type_name = 'sine';
-Channel = 1;              % 激發通道 (1-6)，可自由設定
+Channel = 2;              % 激發通道 (1-6)，可自由設定
 Amplitude = 0.5;          % 振幅 [V]
 Phase = 0;                % 相位 [deg]
 SignalType = 1;           % Sine mode
@@ -449,99 +449,110 @@ fig = figure('Name', sprintf('PI Controller Frequency Response (Ch P%d)', Channe
 magnitude_ratio = results.magnitude_ratio;
 
 % ===== 上圖：Magnitude（線性刻度 0~1.25，所有通道）=====
-subplot(2,1,1);
-hold on; grid on;
+% 手動設定位置：[left, bottom, width, height]
+subplot('Position', [0.1, 0.55, 0.85, 0.35]);
+hold on; grid off;  % 取消背景網格線
 
+% 線寬設定（統一粗細）
+unified_linewidth = 3.5;  % 所有通道統一線寬
+unified_markersize = 9;   % 統一標記大小
+
+% 定義每個通道的標記形狀
+markers = {'o', 's', '^', 'd', 'v', 'p'};  % P1-P6: 圓形、方形、上三角、菱形、下三角、五角星
+
+% 儲存 plot handles 以便圖例對應
+plot_handles_mag = gobjects(6, 1);
+
+% 繪製所有通道（統一樣式）
 for ch = 1:6
     mag = magnitude_ratio(:, ch);
 
     if ch == Channel
-        % 激勵通道：粗實線
-        semilogx(frequencies, mag, '-', 'LineWidth', 3, ...
+        % 激勵通道
+        plot_handles_mag(ch) = semilogx(frequencies, mag, ['-' markers{ch}], ...
+                 'LineWidth', unified_linewidth, ...
                  'Color', channel_colors(ch, :), ...
+                 'MarkerFaceColor', 'none', ...
+                 'MarkerEdgeColor', channel_colors(ch, :), ...
+                 'MarkerSize', unified_markersize, ...
                  'DisplayName', sprintf('P%d (Excited)', ch));
     else
-        % 其他通道：細虛線
-        semilogx(frequencies, mag, '--', 'LineWidth', 1.5, ...
+        % 非激發通道
+        plot_handles_mag(ch) = semilogx(frequencies, mag, ['-' markers{ch}], ...
+                 'LineWidth', unified_linewidth, ...
                  'Color', channel_colors(ch, :), ...
+                 'MarkerFaceColor', 'none', ...
+                 'MarkerEdgeColor', channel_colors(ch, :), ...
+                 'MarkerSize', unified_markersize, ...
                  'DisplayName', sprintf('P%d', ch));
     end
 end
 
-% === 計算並標註 -3dB 頻寬點（修正版）===
-mag_dB_excited = results.magnitude_dB(:, Channel);
-
-% 找到第一個 < -3dB 的點
-idx_below_3dB = find(mag_dB_excited < -3, 1, 'first');
-
-if ~isempty(idx_below_3dB) && idx_below_3dB > 1
-    % 用線性內插找精確的 -3dB 頻率
-    idx_above = idx_below_3dB - 1;  % -3dB 之前的點（> -3dB）
-    idx_below = idx_below_3dB;       % -3dB 之後的點（< -3dB）
-
-    % 提取兩點的數據
-    f1 = frequencies(idx_above);
-    f2 = frequencies(idx_below);
-    mag_dB1 = mag_dB_excited(idx_above);
-    mag_dB2 = mag_dB_excited(idx_below);
-
-    % 線性內插（對數頻率軸用線性內插）
-    f_3dB = f1 + (f2 - f1) * (-3 - mag_dB1) / (mag_dB2 - mag_dB1);
-    mag_3dB = 10^(-3/20);  % -3dB 對應的線性增益 = 0.7079
-
-    % 標註 -3dB 點（使用淺灰色圓圈，不突兀）
-    semilogx(f_3dB, mag_3dB, 'o', ...
-             'MarkerSize', 10, ...
-             'MarkerEdgeColor', [0.5, 0.5, 0.5], ...
-             'MarkerFaceColor', [0.8, 0.8, 0.8], ...
-             'LineWidth', 2, ...
-             'DisplayName', sprintf('-3dB @ %.1f Hz', f_3dB));
-
-    % 加入垂直虛線輔助線（淺灰色）
-    plot([f_3dB, f_3dB], [0, mag_3dB], '--', ...
-         'Color', [0.6, 0.6, 0.6], 'LineWidth', 1.5, ...
-         'HandleVisibility', 'off');
-end
-
-% 設定 Y 軸範圍
+% 設定 Y 軸範圍和刻度
 ylim([0, 1.25]);
+yticks([0, 0.25, 0.5, 0.75, 1.0, 1.25]);
 
-xlabel('Frequency [Hz]', 'FontSize', 12, 'FontWeight', 'bold');
-ylabel('Magnitude Ratio', 'FontSize', 12, 'FontWeight', 'bold');
-title(sprintf('PI Controller Frequency Response (Excited Ch: P%d, Kp=%.2f, Ki=%.2f)', ...
-      Channel, Kp_value, Ki_value), ...
-      'FontSize', 14, 'FontWeight', 'bold');
-legend('Location', 'best', 'NumColumns', 2, 'FontSize', 10);
+% 移除 X 軸標籤和標題
+ylabel('Magnitude', 'FontSize', 22, 'FontWeight', 'bold');  % 字體更大
+% title('Frequency Response', 'FontSize', 18, 'FontWeight', 'bold');  % 移除標題
+
 xlim([frequencies(1), frequencies(end)]);
 
-% 設定 X 軸刻度為 10^n 格式
-set(gca, 'XScale', 'log');
-set(gca, 'XTick', [1, 10, 100, 1000, 10000]);
-set(gca, 'XTickLabel', {'10^0', '10^1', '10^2', '10^3', '10^4'});
-set(gca, 'FontSize', 11, 'FontWeight', 'bold');
+% 設定座標軸格式
+ax1 = gca;
+ax1.XScale = 'log';
+ax1.XTick = [1, 10, 100, 1000, 10000];
+ax1.XTickLabel = {'10^0', '10^1', '10^2', '10^3', '10^4'};
+ax1.FontSize = 18;  % 刻度數字更大
+ax1.FontWeight = 'bold';
+ax1.LineWidth = 2.5;  % 座標軸線加粗
+ax1.Box = 'on';  % 確保外框存在
 
 % ===== 下圖：Phase（只顯示激發通道）=====
-subplot(2,1,2);
-hold on; grid on;
+% 手動設定位置，與 Magnitude 圖高度相同
+subplot('Position', [0.1, 0.1, 0.85, 0.35]);
+hold on; grid off;  % 取消背景網格線
 
 phase_ch = results.phase_lag(:, Channel);
 
-semilogx(frequencies, phase_ch, '-o', 'LineWidth', 2.5, ...
-         'Color', channel_colors(Channel, :), 'MarkerSize', 6, ...
+semilogx(frequencies, phase_ch, ['-' markers{Channel}], ...
+         'LineWidth', unified_linewidth, ...
+         'Color', channel_colors(Channel, :), ...
+         'MarkerSize', unified_markersize, ...
+         'MarkerFaceColor', 'none', ...
+         'MarkerEdgeColor', channel_colors(Channel, :), ...
          'DisplayName', sprintf('P%d (Excited)', Channel));
 
-xlabel('Frequency [Hz]', 'FontSize', 12, 'FontWeight', 'bold');
-ylabel('Phase [deg]', 'FontSize', 12, 'FontWeight', 'bold');
-title(sprintf('Phase Response - P%d', Channel), ...
-      'FontSize', 14, 'FontWeight', 'bold');
-legend('Location', 'best', 'FontSize', 10);
+xlabel('Frequency (Hz)', 'FontSize', 22, 'FontWeight', 'bold');  % 字體更大
+ylabel('Phase (deg)', 'FontSize', 22, 'FontWeight', 'bold');  % 字體更大，修正標籤
+% 移除標題
+% legend 移除
 xlim([frequencies(1), frequencies(end)]);
 
-% 設定 X 軸刻度為 10^n 格式
-set(gca, 'XScale', 'log');
-set(gca, 'XTick', [1, 10, 100, 1000, 10000]);
-set(gca, 'XTickLabel', {'10^0', '10^1', '10^2', '10^3', '10^4'});
-set(gca, 'FontSize', 11, 'FontWeight', 'bold');
+% 設定座標軸格式
+ax2 = gca;
+ax2.XScale = 'log';
+ax2.XTick = [1, 10, 100, 1000, 10000];
+ax2.XTickLabel = {'10^0', '10^1', '10^2', '10^3', '10^4'};
+ax2.FontSize = 18;  % 刻度數字更大
+ax2.FontWeight = 'bold';
+ax2.LineWidth = 2.5;  % 座標軸線加粗
+ax2.Box = 'on';  % 確保外框存在
+
+% 在兩個子圖都完成後，統一添加圖例到 Magnitude 圖上方
+% 回到 Magnitude 子圖
+subplot('Position', [0.1, 0.55, 0.85, 0.35]);
+
+% 添加圖例
+leg_mag = legend(plot_handles_mag, {'P1', 'P2', 'P3', 'P4', 'P5', 'P6'}, ...
+       'Location', 'northoutside', 'NumColumns', 6, 'FontSize', 14, 'FontWeight', 'bold', ...
+       'Orientation', 'horizontal');
+leg_mag.EdgeColor = [0 0 0];  % 黑色外框
+leg_mag.LineWidth = 2.0;  % 圖例框線加粗
+
+% 恢復兩個子圖的位置（防止被圖例壓縮）
+ax1.Position = [0.1, 0.55, 0.85, 0.35];
+ax2.Position = [0.1, 0.1, 0.85, 0.35];
 
 fprintf('  ✓ Bode Plot 完成\n');
 fprintf('\n');

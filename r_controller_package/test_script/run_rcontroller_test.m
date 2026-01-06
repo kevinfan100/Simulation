@@ -21,8 +21,8 @@ signal_type_name = 'sine';      % 'step' 或 'sine'
 % preview
 d = 0;  % 統一使用 d=0 (無 preview)
 Channel = 2;                    % 激發通道 (1-6)
-Amplitude = 1;               % 振幅 [V]
-Frequency = 1000;                % Sine 頻率 [Hz]
+Amplitude = 0.5;               % 振幅 [V]
+Frequency = 100;                % Sine 頻率 [Hz]
 Phase = 0;                      % Sine 相位 [deg]
 StepTime = 0;                 % Step 跳變時間 [s]
                              
@@ -38,8 +38,8 @@ sine_max_sim_time = 50.0;       % 最大模擬時間 [s]
 
 % lambda corresponding bandwidth [Hz]
 T = 1e-5;
-fB_c = 500;   % 第二個測試設定
-fB_e = 2500;
+fB_c = 3200;   % 第二個測試設定
+fB_e = 16000;
 
 lambda_c = exp(-fB_c*T*2*pi);
 lambda_e = exp(-fB_e*T*2*pi);

@@ -34,18 +34,17 @@ addpath(fullfile(scripts_root, 'common'));
 addpath(fullfile(project_root, 'controllers', 'pi_controller'));
 
 % === 核心參數 ===
-Kp_values = [2, 4, 8];          % 要測試的 Kp 值
+Kp_values = [2];          % 要測試的 Kp 值
 test_channels = 1:6;            % 要測試的通道
 zc = 2206;                      % 固定 zc (Ki = Kp * zc)
 
 % === 頻率設定 ===
-freq_low = logspace(0, 2, 6);           % 1~100 Hz, 6 點 (對數分布)
-freq_high = linspace(100, 1500, 15);    % 100~1500 Hz, 15 點 (線性分布)
-frequencies = unique(sort([freq_low, freq_high]));  % 合併並排序去重
-
+frequencies = [1, 5, 10, 20, 50, 100, ...        % 低頻段 (1-100 Hz): 6點
+               125, 200, 250, 400, 500, ...      % 中頻段 (100-500 Hz): 5點
+               625, 800, 1000, 1250, 2000];      % 高頻段 (500-2000 Hz): 5點
 % === Vd Generator 設定 ===
 signal_type_name = 'sine';
-Amplitude = 1;              % 振幅 [V]
+Amplitude = 0.5;              % 振幅 [V]
 Phase = 0;                  % 相位 [deg]
 SignalType = 1;             % Sine mode
 
@@ -83,8 +82,6 @@ fprintf('  總測試次數: %d (6 通道 × %d Kp)\n', ...
         length(test_channels) * length(Kp_values), length(Kp_values));
 fprintf('  頻率範圍: %.1f ~ %.1f Hz (%d 點)\n', ...
         frequencies(1), frequencies(end), length(frequencies));
-fprintf('    低頻段 (1-100 Hz): %d 點對數分布\n', length(freq_low));
-fprintf('    高頻段 (100-1500 Hz): %d 點線性分布\n', length(freq_high));
 fprintf('  Solver: %s (固定步長)\n', solver);
 fprintf('\n');
 

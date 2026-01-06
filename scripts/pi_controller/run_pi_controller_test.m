@@ -16,9 +16,9 @@ test_name = 'sine_1_2206_p6';    % 測試名稱（用於檔案命名）
 
 % Vd Generator
 signal_type_name = 'sine';      % 'step' 或 'sine'
-Channel = 3;                    % 激發通道 (1-6)
-Amplitude = 1;                  % 振幅 [V]
-Frequency = 1000;                % Sine 頻率 [Hz]
+Channel = 1;                    % 激發通道 (1-6)
+Amplitude = 0.1;                  % 振幅 [V]
+Frequency = 100;                % Sine 頻率 [Hz]
 Phase = 0;                      % Sine 相位 [deg]
 StepTime = 0;                % Step 跳變時間 [s]
 
@@ -68,6 +68,15 @@ ylabel_fontsize = 14;            % Y 軸標籤字體大小
 title_fontsize = 15;             % 標題字體大小
 tick_fontsize = 12;              % 刻度字體大小
 legend_fontsize = 11;            % 圖例字體大小
+
+% ========== 視窗位置設定 ==========
+% [left, bottom, width, height] 單位是 pixels
+FIGURE_POSITIONS = struct();
+FIGURE_POSITIONS.Fig1 = [50, 100, 900, 700];           % 圖 1 位置
+FIGURE_POSITIONS.Fig2 = [980, 100, 1200, 800];         % 圖 2 位置
+FIGURE_POSITIONS.Fig3 = [50, 100, 1000, 600];          % 圖 3 位置
+FIGURE_POSITIONS.Fig4 = [980, 100, 1200, 800];         % 圖 4 位置
+FIGURE_POSITIONS.Fig5 = [50, 100, 1200, 800];          % 圖 5 位置
 
 % ┌─────────────────────────────────────────────────────────────┐
 % │                   輸出控制                                   │
@@ -437,41 +446,106 @@ if ENABLE_PLOT
 
     if strcmpi(signal_type_name, 'sine')
         % === 圖 1: Vm_Vd ===
-        fig1 = figure('Name', 'Vm_Vd', 'Position', [100, 100, 800, 600]);
+        fig1 = figure('Name', 'Vm_Vd', 'Position', FIGURE_POSITIONS.Fig1);
 
         hold on;
-        grid on;
+        grid off;  % 取消背景網格線
 
         % 繪製所有通道 (使用激發通道的 Vd)
+        % 策略：非激發通道由粗到細（第1條=激發通道粗度），最後畫激發通道
+
+        % 1. 激發通道的線寬
+        excited_linewidth = measurement_linewidth * 1.5;
+
+        % 2. 非激發通道線寬範圍
+        % 最粗 = 激發通道線寬
+        % 最細 = measurement_linewidth * 0.5 (加粗)
+        base_thick = excited_linewidth;
+        base_thin = measurement_linewidth * 0.5;
+
+        % 3. 先畫非激發通道（由粗到細，保持通道編號順序）
+        % 儲存 plot handle 以便正確對應圖例
+        plot_handles = gobjects(6, 1);  % 預分配 handle 陣列
+
+        draw_count = 0;
         for ch = 1:6
-            plot(Vd_display(:, Channel), Vm_display(:, ch), ...
-                 'Color', colors(ch, :), 'LineWidth', measurement_linewidth);
+            if ch ~= Channel
+                draw_count = draw_count + 1;
+                % 線寬線性遞減（共5條，索引 1~5）
+                lw = base_thick - (base_thick - base_thin) * (draw_count - 1) / 4;
+                plot_handles(ch) = plot(Vd_display(:, Channel), Vm_display(:, ch), ...
+                     'Color', colors(ch, :), 'LineWidth', lw);
+            end
         end
 
-        xlabel(sprintf('Vd[P%d] (V)', Channel), 'FontSize', xlabel_fontsize, 'FontWeight', 'bold');
-        ylabel('Vm (V)', 'FontSize', ylabel_fontsize, 'FontWeight', 'bold');
-        title(sprintf('Vm vs Vd[P%d]', Channel), 'FontSize', title_fontsize, 'FontWeight', 'bold');
+        % 4. 最後畫激發通道（最粗的線）
+        plot_handles(Channel) = plot(Vd_display(:, Channel), Vm_display(:, Channel), ...
+             'Color', colors(Channel, :), 'LineWidth', excited_linewidth);
+
+        xlabel('Vd (V)', 'FontSize', xlabel_fontsize+6, 'FontWeight', 'bold');  % 更大
+        ylabel('Vm (V)', 'FontSize', ylabel_fontsize+6, 'FontWeight', 'bold');  % 更大
+        % 取消標題
+        % title(sprintf('Vm vs Vd[P%d]', Channel), 'FontSize', title_fontsize, 'FontWeight', 'bold');
 
         % 設定座標軸格式
         ax = gca;
-        ax.LineWidth = axis_linewidth;
-        ax.FontSize = tick_fontsize;
+        ax.LineWidth = 3.0;  % 座標軸線加粗（更粗）
+        ax.FontSize = tick_fontsize+6;  % 刻度字體放大（更大）
         ax.FontWeight = 'bold';
+        ax.Box = 'on';  % 保留框線
 
+        % 設定軸範圍和刻度（基於激發通道振幅）
         if vm_vd_unified_axis
+            % 統一軸：使用所有數據的最大值
             max_val = max([max(abs(Vd_display(:))), max(abs(Vm_display(:)))]);
             axis_lim = [-max_val*1.1, max_val*1.1];
             xlim(axis_lim);
             ylim(axis_lim);
             axis square;
+
+            % 刻度基於激發振幅的倍數
+            % 生成以 Amplitude 為基準的刻度點
+            tick_step = Amplitude / 2;  % 每個刻度間距 = 振幅的一半
+            num_ticks = floor(max_val / tick_step);
+            tick_values = (-num_ticks:num_ticks) * tick_step;
+            % 限制刻度在軸範圍內
+            tick_values = tick_values(tick_values >= axis_lim(1) & tick_values <= axis_lim(2));
+            xticks(tick_values);
+            yticks(tick_values);
+        else
+            % 非統一軸：貼近激發通道極值
+            vd_excited = Vd_display(:, Channel);
+            vm_excited = Vm_display(:, Channel);
+
+            vd_range = [min(vd_excited), max(vd_excited)];
+            vm_range = [min(vm_excited), max(vm_excited)];
+            vd_margin = (vd_range(2) - vd_range(1)) * 0.1;
+            vm_margin = (vm_range(2) - vm_range(1)) * 0.1;
+
+            x_lim = [vd_range(1) - vd_margin, vd_range(2) + vd_margin];
+            y_lim = [vm_range(1) - vm_margin, vm_range(2) + vm_margin];
+            xlim(x_lim);
+            ylim(y_lim);
+
+            % 刻度基於激發振幅
+            tick_step = Amplitude / 2;
+            x_ticks = floor(x_lim(1)/tick_step):ceil(x_lim(2)/tick_step);
+            y_ticks = floor(y_lim(1)/tick_step):ceil(y_lim(2)/tick_step);
+            xticks(x_ticks * tick_step);
+            yticks(y_ticks * tick_step);
         end
 
-        % 添加圖例
-        legend({'P1', 'P2', 'P3', 'P4', 'P5', 'P6'}, ...
-               'Location', 'northeast', 'FontSize', legend_fontsize, 'FontWeight', 'bold');
+        % 添加圖例（使用 plot_handles 確保正確對應，位置改為右下）
+        leg = legend(plot_handles, {'P1', 'P2', 'P3', 'P4', 'P5', 'P6'}, ...
+               'Location', 'southeast', 'FontSize', legend_fontsize+2, 'FontWeight', 'bold');
+        % 設定圖例外框
+        leg.BoxFace.ColorType = 'truecoloralpha';
+        leg.BoxFace.ColorData = uint8(255*[1; 1; 1; 0.9]);  % 白底
+        leg.EdgeColor = [0 0 0];  % 黑色外框
+        leg.LineWidth = 1.0;  % 外框線寬
 
         % 在左上角添加 FFT 頻率響應資訊
-        annotation_str = sprintf('Excited Ch P%d: Gain = %.2f%%, Phase = %+.2f°', ...
+        annotation_str = sprintf('Excited P%d Magnitude: %.2f%% Phase: %+.2f°', ...
                                  Channel, magnitude_ratio(Channel)*100, phase_lag(Channel));
 
         % 使用 text 在左上角添加標註（數據座標系統）
@@ -481,12 +555,12 @@ if ENABLE_PLOT
         y_pos = y_range(2) - 0.08 * (y_range(2) - y_range(1));  % 上邊 8%
 
         text(x_pos, y_pos, annotation_str, ...
-             'FontSize', 10, ...
+             'FontSize', 11, ...
              'FontName', 'Consolas', ...
              'FontWeight', 'bold', ...
-             'BackgroundColor', [1 1 1 0.8], ...
+             'BackgroundColor', [1 1 1 0.85], ...
              'EdgeColor', [0.3 0.3 0.3], ...
-             'LineWidth', 1, ...
+             'LineWidth', 1.2, ...
              'Margin', 5, ...
              'VerticalAlignment', 'top', ...
              'HorizontalAlignment', 'left');
@@ -495,7 +569,7 @@ if ENABLE_PLOT
 
         % === 圖 2: 6 通道時域響應 ===
         fig2 = figure('Name', '6 Channels Time Response', ...
-                      'Position', [150, 150, 1200, 800]);
+                      'Position', FIGURE_POSITIONS.Fig2);
 
         for ch = 1:6
             subplot(2, 3, ch);
@@ -509,10 +583,10 @@ if ENABLE_PLOT
             plot(t_display*1000, Vd_display(:, ch), '--', ...
                  'Color', [0, 0, 0], 'LineWidth', reference_linewidth);
 
-            grid on;
-            xlabel('Time (ms)', 'FontSize', xlabel_fontsize-2, 'FontWeight', 'bold');
-            ylabel('HsVm (V)', 'FontSize', ylabel_fontsize-2, 'FontWeight', 'bold');
-            title(sprintf('P%d', ch), 'FontSize', title_fontsize-2, 'FontWeight', 'bold');
+            grid off;  % 去除網格線
+            xlabel('Time (ms)', 'FontSize', xlabel_fontsize+2, 'FontWeight', 'bold');  % 更大
+            ylabel('HsVm (V)', 'FontSize', ylabel_fontsize+2, 'FontWeight', 'bold');  % 更大
+            title(sprintf('P%d', ch), 'FontSize', title_fontsize+2, 'FontWeight', 'bold');
 
             % 設定座標軸格式
             ax = gca;
@@ -527,11 +601,16 @@ if ENABLE_PLOT
             end
         end
 
+        % 加入總標題顯示控制參數
+        sgtitle(sprintf('6 Channels Response (Excited P%d, %.0f Hz, %d cycles) - Kp=%.2f, Ki=%.2f', ...
+                        Channel, Frequency, sine_display_cycles, Kp_value, Ki_value), ...
+                'FontSize', title_fontsize, 'FontWeight', 'bold');
+
         fprintf('  ✓ Figure 2: 6 Channels Time Response\n');
 
         % === 圖 3: 完整時域響應 ===
         fig3 = figure('Name', 'Full Time Response', ...
-                      'Position', [200, 200, 1000, 600]);
+                      'Position', FIGURE_POSITIONS.Fig3);
 
         for ch = 1:6
             plot(t, Vm_data(:, ch), 'Color', colors(ch, :), ...
@@ -544,13 +623,15 @@ if ENABLE_PLOT
         ylabel('Vm (V)', 'FontSize', ylabel_fontsize, 'FontWeight', 'bold');
         title('Full System Response', 'FontSize', title_fontsize, 'FontWeight', 'bold');
         legend({'P1', 'P2', 'P3', 'P4', 'P5', 'P6'}, ...
-               'Location', 'best', 'FontSize', legend_fontsize, 'FontWeight', 'bold');
+               'Location', 'northoutside', 'Orientation', 'horizontal', ...
+               'NumColumns', 6, 'FontSize', legend_fontsize+2, 'FontWeight', 'bold');
 
         % 設定座標軸格式
         ax = gca;
         ax.LineWidth = axis_linewidth;
-        ax.FontSize = tick_fontsize;
+        ax.FontSize = tick_fontsize+4;  % 更大
         ax.FontWeight = 'bold';
+        ax.Box = 'off';  % 去除背景框線
 
         fprintf('  ✓ Figure 3: Full Time Response\n');
 
@@ -579,7 +660,7 @@ if ENABLE_PLOT
 
         % === 圖 4: 控制輸入 u (最後 10 個週期) ===
         fig4 = figure('Name', sprintf('Control Input u (Last %d cycles)', detail_cycles), ...
-                      'Position', [250, 250, 1200, 800]);
+                      'Position', FIGURE_POSITIONS.Fig4);
 
         for ch = 1:6
             subplot(2, 3, ch);
@@ -587,10 +668,14 @@ if ENABLE_PLOT
             plot(t_detail*1000, u_detail(:, ch), '-', ...
                  'Color', colors(ch, :), 'LineWidth', measurement_linewidth);
 
-            grid on;
+            grid off;  % 去除網格線
             xlabel('Time (ms)', 'FontSize', xlabel_fontsize-2, 'FontWeight', 'bold');
             ylabel('Control Input u (V)', 'FontSize', ylabel_fontsize-2, 'FontWeight', 'bold');
-            title(sprintf('P%d', ch), 'FontSize', title_fontsize-2, 'FontWeight', 'bold');
+
+            % 計算 RMS 值
+            u_rms = rms(u_detail(:, ch));
+            title(sprintf('P%d (RMS: %.4f V)', ch, u_rms), ...
+                  'FontSize', title_fontsize-2, 'FontWeight', 'bold');
 
             % 設定座標軸格式
             ax = gca;
@@ -599,11 +684,16 @@ if ENABLE_PLOT
             ax.FontWeight = 'bold';
         end
 
+        % 加入總標題顯示控制參數
+        sgtitle(sprintf('Control Input u (Last %d cycles) - Kp=%.2f, Ki=%.2f', ...
+                        detail_cycles, Kp_value, Ki_value), ...
+                'FontSize', title_fontsize, 'FontWeight', 'bold');
+
         fprintf('  ✓ Figure 4: Control Input u (Last %d cycles)\n', detail_cycles);
 
         % === 圖 5: 追蹤誤差 e (最後 10 個週期) ===
         fig5 = figure('Name', sprintf('Tracking Error e (Last %d cycles)', detail_cycles), ...
-                      'Position', [300, 300, 1200, 800]);
+                      'Position', FIGURE_POSITIONS.Fig5);
 
         for ch = 1:6
             subplot(2, 3, ch);
@@ -611,17 +701,23 @@ if ENABLE_PLOT
             plot(t_detail*1000, e_detail(:, ch), '-', ...
                  'Color', colors(ch, :), 'LineWidth', measurement_linewidth);
 
-            grid on;
+            grid off;  % 去除網格線
             xlabel('Time (ms)', 'FontSize', xlabel_fontsize-2, 'FontWeight', 'bold');
             ylabel('Tracking Error e (V)', 'FontSize', ylabel_fontsize-2, 'FontWeight', 'bold');
-            title(sprintf('P%d', ch), 'FontSize', title_fontsize-2, 'FontWeight', 'bold');
+            title(sprintf('P%d', ch), 'FontSize', title_fontsize+2, 'FontWeight', 'bold');
 
             % 設定座標軸格式
             ax = gca;
             ax.LineWidth = axis_linewidth;
-            ax.FontSize = tick_fontsize-1;
+            ax.FontSize = tick_fontsize+2;  % 更大
             ax.FontWeight = 'bold';
+            ax.Box = 'off';  % 去除背景框線
         end
+
+        % 加入總標題顯示控制參數（可選）
+        sgtitle(sprintf('Tracking Error e (Last %d cycles) - Kp=%.2f, Ki=%.2f', ...
+                        detail_cycles, Kp_value, Ki_value), ...
+                'FontSize', title_fontsize, 'FontWeight', 'bold');
 
         fprintf('  ✓ Figure 5: Tracking Error e (Last %d cycles)\n', detail_cycles);
 
@@ -645,7 +741,7 @@ if ENABLE_PLOT
 
         % 圖 1: 6 通道響應 (0~10ms)
         fig1 = figure('Name', 'Step Response - 6 Channels (0-10ms)', ...
-                      'Position', [100, 100, 1200, 800]);
+                      'Position', FIGURE_POSITIONS.Fig1);
 
         for ch = 1:6
             subplot(2, 3, ch);
@@ -659,16 +755,17 @@ if ENABLE_PLOT
             plot(t_zoom*1000, Vd_zoom(:, ch), '--', 'Color', [0, 0, 0], ...
                  'LineWidth', reference_linewidth);
 
-            grid on;
-            xlabel('Time (ms)', 'FontSize', xlabel_fontsize-2, 'FontWeight', 'bold');
-            ylabel('HsVm (V)', 'FontSize', ylabel_fontsize-2, 'FontWeight', 'bold');
-            title(sprintf('P%d', ch), 'FontSize', title_fontsize-2, 'FontWeight', 'bold');
+            grid off;  % 去除網格線
+            xlabel('Time (ms)', 'FontSize', xlabel_fontsize+2, 'FontWeight', 'bold');  % 更大
+            ylabel('HsVm (V)', 'FontSize', ylabel_fontsize+2, 'FontWeight', 'bold');  % 更大
+            title(sprintf('P%d', ch), 'FontSize', title_fontsize+2, 'FontWeight', 'bold');
 
             % 設定座標軸格式
             ax = gca;
             ax.LineWidth = axis_linewidth;
-            ax.FontSize = tick_fontsize-1;
+            ax.FontSize = tick_fontsize+2;  % 更大
             ax.FontWeight = 'bold';
+            ax.Box = 'off';  % 去除背景框線
 
             % 添加圖例（只在第一個子圖）
             if ch == 1
@@ -681,7 +778,7 @@ if ENABLE_PLOT
 
         % 圖 2: 誤差分析 (0~10ms)
         fig2 = figure('Name', 'Error Analysis (0-10ms)', ...
-                      'Position', [150, 150, 1000, 600]);
+                      'Position', FIGURE_POSITIONS.Fig2);
 
         for ch = 1:6
             plot(t_zoom*1000, e_zoom(:, ch), 'Color', colors(ch, :), ...
@@ -689,24 +786,26 @@ if ENABLE_PLOT
             hold on;
         end
 
-        grid on;
-        xlabel('Time (ms)', 'FontSize', xlabel_fontsize, 'FontWeight', 'bold');
-        ylabel('Error (V)', 'FontSize', ylabel_fontsize, 'FontWeight', 'bold');
-        title('Tracking Error (0-10ms)', 'FontSize', title_fontsize, 'FontWeight', 'bold');
+        grid off;  % 去除網格線
+        xlabel('Time (ms)', 'FontSize', xlabel_fontsize+4, 'FontWeight', 'bold');  % 更大
+        ylabel('Error (V)', 'FontSize', ylabel_fontsize+4, 'FontWeight', 'bold');  % 更大
+        title('Tracking Error (0-10ms)', 'FontSize', title_fontsize+2, 'FontWeight', 'bold');
         legend({'P1', 'P2', 'P3', 'P4', 'P5', 'P6'}, ...
-               'Location', 'best', 'FontSize', legend_fontsize, 'FontWeight', 'bold');
+               'Location', 'northoutside', 'Orientation', 'horizontal', ...
+               'NumColumns', 6, 'FontSize', legend_fontsize+2, 'FontWeight', 'bold');
 
         % 設定座標軸格式
         ax = gca;
         ax.LineWidth = axis_linewidth;
-        ax.FontSize = tick_fontsize;
+        ax.FontSize = tick_fontsize+4;  % 更大
         ax.FontWeight = 'bold';
+        ax.Box = 'off';  % 去除背景框線
 
         fprintf('  ✓ Figure 2: Error Analysis (0-10ms)\n');
 
         % 圖 3: 控制輸入 (完整時間)
         fig3 = figure('Name', 'Control Input', ...
-                      'Position', [200, 200, 1000, 600]);
+                      'Position', FIGURE_POSITIONS.Fig3);
 
         for ch = 1:6
             plot(t_step_full, u_step_full(:, ch), 'Color', colors(ch, :), ...
@@ -714,18 +813,20 @@ if ENABLE_PLOT
             hold on;
         end
 
-        grid on;
-        xlabel('Time (s)', 'FontSize', xlabel_fontsize, 'FontWeight', 'bold');
-        ylabel('Control Input (V)', 'FontSize', ylabel_fontsize, 'FontWeight', 'bold');
-        title('Control Input', 'FontSize', title_fontsize, 'FontWeight', 'bold');
+        grid off;  % 去除網格線
+        xlabel('Time (s)', 'FontSize', xlabel_fontsize+4, 'FontWeight', 'bold');  % 更大
+        ylabel('Control Input (V)', 'FontSize', ylabel_fontsize+4, 'FontWeight', 'bold');  % 更大
+        title('Control Input', 'FontSize', title_fontsize+2, 'FontWeight', 'bold');
         legend({'P1', 'P2', 'P3', 'P4', 'P5', 'P6'}, ...
-               'Location', 'best', 'FontSize', legend_fontsize, 'FontWeight', 'bold');
+               'Location', 'northoutside', 'Orientation', 'horizontal', ...
+               'NumColumns', 6, 'FontSize', legend_fontsize+2, 'FontWeight', 'bold');
 
         % 設定座標軸格式
         ax = gca;
         ax.LineWidth = axis_linewidth;
-        ax.FontSize = tick_fontsize;
+        ax.FontSize = tick_fontsize+4;  % 更大
         ax.FontWeight = 'bold';
+        ax.Box = 'off';  % 去除背景框線
 
         fprintf('  ✓ Figure 3: Control Input\n');
     end
@@ -745,7 +846,7 @@ if SAVE_PNG || SAVE_MAT
             saveas(fig1, fullfile(test_dir, 'Vm_Vd.png'));
             saveas(fig2, fullfile(test_dir, '6ch_time_response.png'));
             saveas(fig3, fullfile(test_dir, 'full_response.png'));
-            saveas(fig4, fullfile(test_dir, 'control_input_u.png'));
+            saveas(fig4, fullfile(test_dir, 'control_input_u_1-100ms.png'));
             saveas(fig5, fullfile(test_dir, 'tracking_error_e.png'));
         else
             saveas(fig1, fullfile(test_dir, 'step_response_6ch.png'));
